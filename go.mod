@@ -155,10 +155,14 @@ replace (
 	github.com/99designs/keyring => github.com/crypto-org-chain/keyring v1.1.6-fixes
 	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.45.4
 
+	github.com/cosmos/gorocksdb => github.com/JayT106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1
+
 	// TODO: remove when middleware will be implemented
 	github.com/cosmos/ibc-go/v2 => github.com/crypto-org-chain/ibc-go/v2 v2.2.0-hooks2
 
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+	github.com/tendermint/tm-db => github.com/JayT106/tm-db v0.6.8-0.20220520164754-f1e8ccff0db6
 
 	github.com/tharsis/ethermint => github.com/crypto-org-chain/ethermint v0.10.0-alpha1-cronos-9
 
