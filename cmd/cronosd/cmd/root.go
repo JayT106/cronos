@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/crypto-org-chain/cronos/cmd/cronosd/experimental"
@@ -276,6 +277,21 @@ func (a appCreator) appExport(
 		return servertypes.ExportedApp{}, errors.New("application home not set")
 	}
 
+	exportBin, ok := appOpts.Get(flags.FlagExportGenesisToFiles).(bool)
+	exportPath := ""
+	if ok && exportBin {
+		exportPath, ok := appOpts.Get(flags.FlagExportGenesisFilePath).(string)
+		if !ok || exportPath == "" {
+			b, err := os.Executable()
+			if err != nil {
+				return servertypes.ExportedApp{}, errors.New("application path not found")
+			}
+			exportPath = filepath.Dir(b)
+		}
+
+		exportPath = path.Join(exportPath, "genesis")
+	}
+
 	if height != -1 {
 		anApp = app.New(
 			logger,
@@ -308,7 +324,7 @@ func (a appCreator) appExport(
 		)
 	}
 
-	return anApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs)
+	return anApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs, exportPath)
 }
 
 func overwriteFlagDefaults(c *cobra.Command, defaults map[string]string) {
