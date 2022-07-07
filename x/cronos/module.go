@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path"
 
 	// this line is used by starport scaffolding # 1
 
@@ -179,4 +181,42 @@ func (am AppModule) BeginBlock(_ sdk.Context, _ abci.RequestBeginBlock) {}
 // returns no validator updates.
 func (am AppModule) EndBlock(_ sdk.Context, _ abci.RequestEndBlock) []abci.ValidatorUpdate {
 	return []abci.ValidatorUpdate{}
+}
+
+// InitGenesis performs the capability module's genesis initialization It returns
+// no validator updates.
+func (am AppModule) InitGenesisFrom(ctx sdk.Context, cdc codec.JSONCodec, importPath string) ([]abci.ValidatorUpdate, error) {
+	// var genState types.GenesisState
+	// // Initialize global index to index in genesis state
+	// cdc.MustUnmarshalJSON(gs, &genState)
+
+	// InitGenesis(ctx, am.keeper, genState)
+
+	return []abci.ValidatorUpdate{}, nil
+}
+
+// ExportGenesis returns the capability module's exported genesis state as raw JSON bytes.
+func (am AppModule) ExportGenesisTo(ctx sdk.Context, cdc codec.JSONCodec, exportPath string) error {
+	if err := os.MkdirAll(exportPath, 0755); err != nil {
+		return err
+	}
+
+	f, err := os.Create(path.Join(exportPath, "genesis0"))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	gs := ExportGenesis(ctx, am.keeper)
+	bz, err := gs.Marshal()
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(bz)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

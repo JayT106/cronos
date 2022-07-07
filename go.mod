@@ -153,14 +153,16 @@ require (
 replace (
 	// TODO: fix keyring upstream
 	github.com/99designs/keyring => github.com/crypto-org-chain/keyring v1.1.6-fixes
-	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.45.4
+	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220705201145-9495d8cda98c
 
 	// TODO: remove when middleware will be implemented
-	github.com/cosmos/ibc-go/v2 => github.com/crypto-org-chain/ibc-go/v2 v2.2.0-hooks2
+	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220707001642-6c3bfe414693
 
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-	github.com/tharsis/ethermint => github.com/crypto-org-chain/ethermint v0.10.0-alpha1-cronos-9
+	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.11
+
+	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.3
 
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )
