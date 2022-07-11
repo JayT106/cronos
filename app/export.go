@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -29,11 +30,30 @@ func (app *App) ExportAppStateAndValidators(
 		app.prepForZeroHeightGenesis(ctx, jailAllowedAddrs)
 	}
 
+	fmt.Printf("exportPath: %s\n", exportPath)
+
 	app.mm.SetBinaryExportPath(exportPath)
+	fmt.Printf("exporting genesis...\n")
 	genState, err := app.mm.ExportGenesis(ctx, app.appCodec)
 	if err != nil {
 		return servertypes.ExportedApp{}, err
 	}
+
+	if exportPath == "" {
+		appState, err := json.MarshalIndent(genState, "", "  ")
+		if err != nil {
+			return servertypes.ExportedApp{}, err
+		}
+
+		validators, err := staking.WriteValidators(ctx, app.StakingKeeper)
+		return servertypes.ExportedApp{
+			AppState:        appState,
+			Validators:      validators,
+			Height:          height,
+			ConsensusParams: app.BaseApp.GetConsensusParams(ctx),
+		}, err
+	}
+
 	appState, err := json.MarshalIndent(genState, "", "  ")
 	if err != nil {
 		return servertypes.ExportedApp{}, err
