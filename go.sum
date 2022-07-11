@@ -661,6 +661,8 @@ github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220705201145-9495d8cda98c h1:UvDEo
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220705201145-9495d8cda98c/go.mod h1:WOqtDxN3eCCmnYLVla10xG7lEXkFjpTaqm2a2WasgCc=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220711155106-605aac9a9a84 h1:Qjg/wJgant7G+5MveU7XSKQ7kJAY/aMClSLd+UM6t9c=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220711155106-605aac9a9a84/go.mod h1:WOqtDxN3eCCmnYLVla10xG7lEXkFjpTaqm2a2WasgCc=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220711203652-fc9421faaede h1:FJpNYjszIaVpx+Xg/NYzaxmDjAiVRQZP36MreHFKZWM=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220711203652-fc9421faaede/go.mod h1:WOqtDxN3eCCmnYLVla10xG7lEXkFjpTaqm2a2WasgCc=
 github.com/jayt106/ethermint v0.10.3 h1:JcdUGNTN7vAb7IU6Lg5E/tmSPgAT8H3OZp+nUsxQL58=
 github.com/jayt106/ethermint v0.10.3/go.mod h1:sFE19bK3kWWnE+UgkhknkwcoD0yHfgIS5l8V1tWhv/I=
 github.com/jayt106/gravity-bridge/module v0.3.11 h1:Sno0bc/k7Kn26bkGBPnHuUbXo1YBvo7kHEmbyqjB3Ao=
