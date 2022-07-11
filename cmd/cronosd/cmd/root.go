@@ -284,7 +284,7 @@ func (a appCreator) appExport(
 
 	exportPath := ""
 	if ok && exportBin {
-		exportPath, ok := appOpts.Get(flags.FlagExportGenesisFilePath).(string)
+		exportPath, ok = appOpts.Get(flags.FlagExportGenesisFilePath).(string)
 		fmt.Printf("exportPath: %v\n", exportPath)
 
 		if !ok || exportPath == "" {
