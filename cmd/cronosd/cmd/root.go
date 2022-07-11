@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -278,9 +279,14 @@ func (a appCreator) appExport(
 	}
 
 	exportBin, ok := appOpts.Get(flags.FlagExportGenesisToFiles).(bool)
+
+	fmt.Printf("exportBin: %v\n", exportBin)
+
 	exportPath := ""
 	if ok && exportBin {
 		exportPath, ok := appOpts.Get(flags.FlagExportGenesisFilePath).(string)
+		fmt.Printf("exportPath: %v\n", exportPath)
+
 		if !ok || exportPath == "" {
 			b, err := os.Executable()
 			if err != nil {
