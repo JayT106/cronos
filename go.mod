@@ -162,7 +162,7 @@ replace (
 
 	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.11
 
-	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.3
+	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220713181527-b6f1a9d154ee
 
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )
