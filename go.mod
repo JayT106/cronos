@@ -153,18 +153,18 @@ require (
 replace (
 	// TODO: fix keyring upstream
 	github.com/99designs/keyring => github.com/crypto-org-chain/keyring v1.1.6-fixes
-	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220714154813-d3115e60fa07
+	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220714191740-3b1ee7d8c788
 
 	// TODO: remove when middleware will be implemented
-	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220707001642-6c3bfe414693
+	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220714192844-d03b1bc038d1
 
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.11
+	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.12
 
 	github.com/tendermint/tm-db => github.com/jayt106/tm-db v0.6.8-0.20220714151545-a51b347ddefe
 
-	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220714151829-f7e6972aea80
+	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.1-cronos
 
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )

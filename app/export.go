@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 
@@ -19,6 +20,7 @@ import (
 func (app *App) ExportAppStateAndValidators(
 	forZeroHeight bool, jailAllowedAddrs []string, exportPath string,
 ) (servertypes.ExportedApp, error) {
+
 	// as if they could withdraw from the start of the next block
 	ctx := app.NewContext(true, tmproto.Header{Height: app.LastBlockHeight()})
 
@@ -34,7 +36,9 @@ func (app *App) ExportAppStateAndValidators(
 
 	app.mm.SetBinaryExportPath(exportPath)
 	fmt.Printf("exporting genesis...\n")
+	ts := time.Now()
 	genState, err := app.mm.ExportGenesis(ctx, app.appCodec)
+	fmt.Printf("exporting time spent %s\n", time.Since(ts))
 	if err != nil {
 		return servertypes.ExportedApp{}, err
 	}
@@ -60,6 +64,7 @@ func (app *App) ExportAppStateAndValidators(
 	}
 
 	validators, err := staking.WriteValidators(ctx, app.StakingKeeper)
+
 	return servertypes.ExportedApp{
 		AppState:        appState,
 		Validators:      validators,
