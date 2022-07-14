@@ -162,6 +162,8 @@ replace (
 
 	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.11
 
+	github.com/tendermint/tm-db => github.com/jayt106/tm-db v0.6.8-0.20220714151545-a51b347ddefe
+
 	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220714151829-f7e6972aea80
 
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2

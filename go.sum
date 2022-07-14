@@ -677,6 +677,8 @@ github.com/jayt106/gravity-bridge/module v0.3.11 h1:Sno0bc/k7Kn26bkGBPnHuUbXo1YB
 github.com/jayt106/gravity-bridge/module v0.3.11/go.mod h1:z5RTLVBf+t4oMKhyGhQQ4YBBAv0G92RkTnY8VLRdnh0=
 github.com/jayt106/ibc-go/v2 v2.2.1-0.20220707001642-6c3bfe414693 h1:L3edgYPMD1woS6QxNjB5XfzBkVlTucCcIobs7HYuQJ8=
 github.com/jayt106/ibc-go/v2 v2.2.1-0.20220707001642-6c3bfe414693/go.mod h1:5wieOF25RX4crfuERb3d11Lx2RhpfNS/7FcEy3rWeYY=
+github.com/jayt106/tm-db v0.6.8-0.20220714151545-a51b347ddefe h1:wIttGZ4bX9213Wv0R+73yhd857g3XJ01CB3eGMU/aAs=
+github.com/jayt106/tm-db v0.6.8-0.20220714151545-a51b347ddefe/go.mod h1:byQDzFkZV1syXr/ReXS808NxA2xvyuuVgXOJ/088L6I=
 github.com/jedisct1/go-minisign v0.0.0-20190909160543-45766022959e/go.mod h1:G1CVv03EnqU1wYL2dFwXxW2An0az9JTl/ZsqXQeBlkU=
 github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
