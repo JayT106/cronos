@@ -162,7 +162,7 @@ replace (
 
 	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.12
 
-	github.com/tendermint/tm-db => github.com/jayt106/tm-db v0.6.8-0.20220714151545-a51b347ddefe
+	github.com/tendermint/tm-db => github.com/jayt106/tm-db v0.6.8-0.20220721184108-429f01da303a
 
 	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220721154729-e76743c7b8c5
 
