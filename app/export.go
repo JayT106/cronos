@@ -21,6 +21,8 @@ func (app *App) ExportAppStateAndValidators(
 	forZeroHeight bool, jailAllowedAddrs []string, exportPath string,
 ) (servertypes.ExportedApp, error) {
 
+	ts1 := time.Now()
+
 	// as if they could withdraw from the start of the next block
 	ctx := app.NewContext(true, tmproto.Header{Height: app.LastBlockHeight()})
 
@@ -36,9 +38,11 @@ func (app *App) ExportAppStateAndValidators(
 
 	app.mm.SetBinaryExportPath(exportPath)
 	fmt.Printf("exporting genesis...\n")
-	ts := time.Now()
+	fmt.Printf("debugging %s\n", time.Since(ts1))
+
+	ts2 := time.Now()
 	genState, err := app.mm.ExportGenesis(ctx, app.appCodec)
-	fmt.Printf("exporting time spent %s\n", time.Since(ts))
+	fmt.Printf("exporting time spent %s\n", time.Since(ts2))
 	if err != nil {
 		return servertypes.ExportedApp{}, err
 	}
