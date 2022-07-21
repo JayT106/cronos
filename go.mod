@@ -155,6 +155,8 @@ replace (
 	github.com/99designs/keyring => github.com/crypto-org-chain/keyring v1.1.6-fixes
 	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220721142216-c550c0dd8274
 
+	github.com/cosmos/gorocksdb => github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1
+
 	// TODO: remove when middleware will be implemented
 	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220714192844-d03b1bc038d1
 

@@ -671,6 +671,8 @@ github.com/jayt106/ethermint v0.10.4-0.20220720153821-5f8d08f68989 h1:OPvZ8K6EPV
 github.com/jayt106/ethermint v0.10.4-0.20220720153821-5f8d08f68989/go.mod h1:E7Mnm3AVm7No49KxRf0P13o/yaGDhRF70ALBLF2CCTo=
 github.com/jayt106/ethermint v0.10.4-0.20220721154729-e76743c7b8c5 h1:yCJVo4JQjU2DDgvRDEEAmnlRGoXtAO9lO5K1NBnU8ck=
 github.com/jayt106/ethermint v0.10.4-0.20220721154729-e76743c7b8c5/go.mod h1:qA3xDA9M1BFXB13Ok7VBEZbm57n7C3/KDAiMAwJ/zQg=
+github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1 h1:VlfvDm+AVwCSFWG/C8YtOhYoYDdzcdXwx2epyxWzRpg=
+github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1/go.mod h1:aaKvKItm514hKfNJpUJXnnOWeBnk2GL4+Qw9NHizILw=
 github.com/jayt106/gravity-bridge/module v0.3.12 h1:QumHzr9H3SZRiDYxe9IhgZ9qR1oFGSa81iowoTiwceM=
 github.com/jayt106/gravity-bridge/module v0.3.12/go.mod h1:/d8HUcott/snAVJ60NpbuBCXk7ksc5Md3Q4IuwXyReo=
 github.com/jayt106/ibc-go/v2 v2.2.1-0.20220714192844-d03b1bc038d1 h1:ty3k27F6p2BUZGg3e5Ju7DvL0y9/kVMBKdZ4aA+EdBo=
