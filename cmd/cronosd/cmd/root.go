@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/crypto-org-chain/cronos/cmd/cronosd/experimental"
 	"github.com/crypto-org-chain/cronos/x/cronos"
@@ -126,6 +127,8 @@ func initRootCmd(rootCmd *cobra.Command, encodingConfig params.EncodingConfig) {
 		config.Cmd(),
 		// this line is used by starport scaffolding # stargate/root/commands
 	)
+
+	fmt.Printf("current time: %v\n", time.Now())
 
 	a := appCreator{encodingConfig}
 	ethermintserver.AddCommands(rootCmd, app.DefaultNodeHome, a.newApp, a.appExport, addModuleInitFlags)
