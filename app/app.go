@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -779,6 +780,8 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 	jsonObj["binary_genesis_state"] = "true"
 	loadAppStateFromFolder, _ := json.MarshalIndent(jsonObj, "", "  ")
 
+	fmt.Printf("reqAppState: %v, expectAppState: %v, same: %v\n", req.AppStateBytes, loadAppStateFromFolder, bytes.Equal(loadAppStateFromFolder, req.AppStateBytes))
+
 	var genesisState GenesisState
 	if bytes.Equal(loadAppStateFromFolder, req.AppStateBytes) {
 		app.mm.SetGenesisPath(path.Join(app.homepath, "config", "genesis"))
@@ -787,6 +790,8 @@ func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.Res
 			panic(err)
 		}
 	}
+	fmt.Printf("genesisPath: %s\n", app.mm.GenesisPath)
+
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }
