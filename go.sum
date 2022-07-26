@@ -669,6 +669,8 @@ github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220725222102-3744e09bc2f3 h1:2Q3rI
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220725222102-3744e09bc2f3/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220726145719-ebf43a0e578e h1:C4hVRSjdUUe/SPDsXuaYKjHxumcf6jy0je4iqLCHzDQ=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220726145719-ebf43a0e578e/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220726205621-64eda40f714f h1:VQ6LmJuYLcGSB+zWveuMaPVb3kk7Bz5MQ0zWrUpVAz4=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220726205621-64eda40f714f/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
 github.com/jayt106/ethermint v0.10.1-cronos h1:qP8Z98JrAcjpke4FqVltEJqecvf6ck4peezLhwaRivw=
 github.com/jayt106/ethermint v0.10.1-cronos/go.mod h1:uO0+nL3AxyOTz9cq0txG2RxGH5UMPIs7BGfTj5xdhhg=
 github.com/jayt106/ethermint v0.10.4-0.20220720153821-5f8d08f68989 h1:OPvZ8K6EPVC2wQUQfyhy7pSjvDnYOeEZdqzS7otYBhc=
