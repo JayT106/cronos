@@ -183,15 +183,32 @@ func (am AppModule) EndBlock(_ sdk.Context, _ abci.RequestEndBlock) []abci.Valid
 	return []abci.ValidatorUpdate{}
 }
 
-// InitGenesis performs the capability module's genesis initialization It returns
+// InitGenesisFrom performs the capability module's genesis initialization It returns
 // no validator updates.
 func (am AppModule) InitGenesisFrom(ctx sdk.Context, cdc codec.JSONCodec, importPath string) ([]abci.ValidatorUpdate, error) {
-	// var genState types.GenesisState
-	// // Initialize global index to index in genesis state
-	// cdc.MustUnmarshalJSON(gs, &genState)
+	fp := path.Join(importPath, fmt.Sprintf("genesis_%s.bin", types.ModuleName))
+	f, err := os.OpenFile(fp, os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-	// InitGenesis(ctx, am.keeper, genState)
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
 
+	bz := make([]byte, fi.Size())
+	if _, err := f.Read(bz); err != nil {
+		return nil, err
+	}
+
+	var gs *types.GenesisState
+	if err := gs.Unmarshal(bz); err != nil {
+		return nil, err
+	}
+
+	InitGenesis(ctx, am.keeper, *gs)
 	return []abci.ValidatorUpdate{}, nil
 }
 
@@ -201,8 +218,8 @@ func (am AppModule) ExportGenesisTo(ctx sdk.Context, cdc codec.JSONCodec, export
 		return err
 	}
 
-	filePath := path.Join(exportPath, fmt.Sprintf("%s%d", types.ModuleName, 0))
-	f, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	fp := path.Join(exportPath, fmt.Sprintf("genesis_%s.bin", types.ModuleName))
+	f, err := os.Create(fp)
 	if err != nil {
 		return err
 	}
@@ -211,11 +228,10 @@ func (am AppModule) ExportGenesisTo(ctx sdk.Context, cdc codec.JSONCodec, export
 	gs := ExportGenesis(ctx, am.keeper)
 	bz, err := gs.Marshal()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal %s genesis state: %s", types.ModuleName, err)
 	}
 
-	_, err = f.Write(bz)
-	if err != nil {
+	if _, err = f.Write(bz); err != nil {
 		return err
 	}
 

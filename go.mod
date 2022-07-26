@@ -153,12 +153,12 @@ require (
 replace (
 	// TODO: fix keyring upstream
 	github.com/99designs/keyring => github.com/crypto-org-chain/keyring v1.1.6-fixes
-	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220721142216-c550c0dd8274
+	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220725222102-3744e09bc2f3
 
 	github.com/cosmos/gorocksdb => github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1
 
 	// TODO: remove when middleware will be implemented
-	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220714192844-d03b1bc038d1
+	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220726012703-63e533638ca6
 
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
@@ -166,7 +166,7 @@ replace (
 
 	github.com/tendermint/tm-db => github.com/jayt106/tm-db v0.6.8-0.20220721184108-429f01da303a
 
-	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220721154729-e76743c7b8c5
+	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220726015705-bf2b79084b09
 
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )

@@ -36,7 +36,7 @@ func (app *App) ExportAppStateAndValidators(
 
 	fmt.Printf("exportPath: %s\n", exportPath)
 
-	app.mm.SetBinaryExportPath(exportPath)
+	app.mm.SetGenesisPath(exportPath)
 	fmt.Printf("current time: %v\n", time.Now())
 	fmt.Printf("exporting genesis...\n")
 	fmt.Printf("debugging %s\n", time.Since(ts1))
