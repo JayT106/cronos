@@ -48,24 +48,19 @@ func (app *App) ExportAppStateAndValidators(
 		return servertypes.ExportedApp{}, err
 	}
 
-	if exportPath == "" {
-		appState, err := json.MarshalIndent(genState, "", "  ")
+	var appState []byte
+	if exportPath != "" {
+		var jsonObj = make(map[string]interface{})
+		jsonObj["binary_genesis_state"] = "true"
+		appState, err = json.MarshalIndent(jsonObj, "", "  ")
 		if err != nil {
 			return servertypes.ExportedApp{}, err
 		}
-
-		validators, err := staking.WriteValidators(ctx, app.StakingKeeper)
-		return servertypes.ExportedApp{
-			AppState:        appState,
-			Validators:      validators,
-			Height:          height,
-			ConsensusParams: app.BaseApp.GetConsensusParams(ctx),
-		}, err
-	}
-
-	appState, err := json.MarshalIndent(genState, "", "  ")
-	if err != nil {
-		return servertypes.ExportedApp{}, err
+	} else {
+		appState, err = json.MarshalIndent(genState, "", "  ")
+		if err != nil {
+			return servertypes.ExportedApp{}, err
+		}
 	}
 
 	validators, err := staking.WriteValidators(ctx, app.StakingKeeper)

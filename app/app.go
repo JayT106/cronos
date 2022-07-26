@@ -1,10 +1,13 @@
 package app
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"math/big"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -95,7 +98,6 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v2/modules/core/05-port/types"
 	ibchost "github.com/cosmos/ibc-go/v2/modules/core/24-host"
 	ibckeeper "github.com/cosmos/ibc-go/v2/modules/core/keeper"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 
 	evmante "github.com/tharsis/ethermint/app/ante"
 	srvflags "github.com/tharsis/ethermint/server/flags"
@@ -279,6 +281,9 @@ type App struct {
 
 	// module configurator
 	configurator module.Configurator
+
+	// the root folder of the app config and data
+	homepath string
 }
 
 // New returns a reference to an initialized chain.
@@ -346,6 +351,7 @@ func New(
 		keys:              keys,
 		tkeys:             tkeys,
 		memKeys:           memKeys,
+		homepath:          homePath,
 	}
 
 	app.ParamsKeeper = initParamsKeeper(appCodec, cdc, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey], experimental)
@@ -769,9 +775,17 @@ func (app *App) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.Respo
 
 // InitChainer application update at chain initialization
 func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
+	var jsonObj = make(map[string]interface{})
+	jsonObj["binary_genesis_state"] = "true"
+	loadAppStateFromFolder, _ := json.MarshalIndent(jsonObj, "", "  ")
+
 	var genesisState GenesisState
-	if err := tmjson.Unmarshal(req.AppStateBytes, &genesisState); err != nil {
-		panic(err)
+	if bytes.Equal(loadAppStateFromFolder, req.AppStateBytes) {
+		app.mm.SetGenesisPath(path.Join(app.homepath, "config", "genesis"))
+	} else {
+		if err := json.Unmarshal(req.AppStateBytes, &genesisState); err != nil {
+			panic(err)
+		}
 	}
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
