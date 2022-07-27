@@ -158,8 +158,7 @@ replace (
 	github.com/cosmos/gorocksdb => github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1
 
 	// TODO: remove when middleware will be implemented
-	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220726012703-63e533638ca6
-
+	github.com/cosmos/ibc-go/v2 => github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727203300-e27dde199c98
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
 	github.com/peggyjv/gravity-bridge/module => github.com/jayt106/gravity-bridge/module v0.3.12
