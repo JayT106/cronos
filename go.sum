@@ -663,6 +663,8 @@ github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727203300-e27dde199c98 h1:khsYGM9arR4
 github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727203300-e27dde199c98/go.mod h1:T++8bf5kRH8udlOZE6Zkey7Dr0T8r/1gYSB9immNsLo=
 github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727205652-b64dc9dea8e5 h1:lT/e0rBPmi5DjsztPwJbtsCAMTmhQ5sDlgUYss/kV8o=
 github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727205652-b64dc9dea8e5/go.mod h1:T++8bf5kRH8udlOZE6Zkey7Dr0T8r/1gYSB9immNsLo=
+github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727233110-612595435629 h1:QK/d/pJtH6YRWe1mKU9+UsEoSO/2GZPRKnuRyZWX4Vc=
+github.com/jayt106/ibc-go/v2 v2.2.1-0.20220727233110-612595435629/go.mod h1:T++8bf5kRH8udlOZE6Zkey7Dr0T8r/1gYSB9immNsLo=
 github.com/jayt106/tm-db v0.6.8-0.20220721184108-429f01da303a h1:qKhB0R0V3ePcGojHeu5iufgSUygmDlap1fWKSDF7ZK4=
 github.com/jayt106/tm-db v0.6.8-0.20220721184108-429f01da303a/go.mod h1:yC0m7jbHWnUUl/d+Di5ikr1Ix7wx0lqd1xBvfNqLOus=
 github.com/jedisct1/go-minisign v0.0.0-20190909160543-45766022959e/go.mod h1:G1CVv03EnqU1wYL2dFwXxW2An0az9JTl/ZsqXQeBlkU=
