@@ -653,6 +653,8 @@ github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727192014-cbb056895a88 h1:Xjcn1
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727192014-cbb056895a88/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727233902-f0df84e21202 h1:AwLJgrhuLit1EMP9TYsRUANSuIIuxI2k4we7bzFTKEE=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727233902-f0df84e21202/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727235023-cbb9157938ab h1:zWAQ/I7vRWAJA4nmtljey7zYLY7+EEow38hm2IHnohw=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727235023-cbb9157938ab/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
 github.com/jayt106/ethermint v0.10.4-0.20220726015705-bf2b79084b09 h1:GxdjDuT9YMZrBlK5ROoa8P1RDItc7fQc3IlL4TpAWLM=
 github.com/jayt106/ethermint v0.10.4-0.20220726015705-bf2b79084b09/go.mod h1:ZrI6YWBYgdUKQYa02jt6KMEEEEHLW+gY+iTXu1BisPo=
 github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1 h1:VlfvDm+AVwCSFWG/C8YtOhYoYDdzcdXwx2epyxWzRpg=

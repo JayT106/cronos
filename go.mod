@@ -153,8 +153,7 @@ require (
 replace (
 	// TODO: fix keyring upstream
 	github.com/99designs/keyring => github.com/crypto-org-chain/keyring v1.1.6-fixes
-	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727233902-f0df84e21202
-
+	github.com/cosmos/cosmos-sdk => github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727235023-cbb9157938ab
 	github.com/cosmos/gorocksdb => github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1
 
 	// TODO: remove when middleware will be implemented
