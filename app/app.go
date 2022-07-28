@@ -777,7 +777,7 @@ func (app *App) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.Respo
 // InitChainer application update at chain initialization
 func (app *App) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 	var jsonObj = make(map[string]json.RawMessage)
-	jsonObj["binary_genesis_state"] = []byte("\"true\"")
+	jsonObj["binary_genesis_state"] = []byte("true")
 	loadAppStateFromFolder, _ := json.Marshal(jsonObj)
 
 	fmt.Printf("reqAppState: %v, expectAppState: %v, same: %v\n", req.AppStateBytes, loadAppStateFromFolder, bytes.Equal(loadAppStateFromFolder, req.AppStateBytes))
