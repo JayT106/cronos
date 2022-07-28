@@ -203,12 +203,9 @@ func (am AppModule) InitGenesisFrom(ctx sdk.Context, cdc codec.JSONCodec, import
 		return nil, err
 	}
 
-	var gs *types.GenesisState
-	if err := gs.Unmarshal(bz); err != nil {
-		return nil, err
-	}
-
-	InitGenesis(ctx, am.keeper, *gs)
+	var gs types.GenesisState
+	cdc.MustUnmarshalJSON(bz, &gs)
+	InitGenesis(ctx, am.keeper, gs)
 	return []abci.ValidatorUpdate{}, nil
 }
 
@@ -226,11 +223,7 @@ func (am AppModule) ExportGenesisTo(ctx sdk.Context, cdc codec.JSONCodec, export
 	defer f.Close()
 
 	gs := ExportGenesis(ctx, am.keeper)
-	bz, err := gs.Marshal()
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal %s genesis state: %s", types.ModuleName, err)
-	}
-
+	bz := cdc.MustMarshalJSON(gs)
 	if _, err = f.Write(bz); err != nil {
 		return err
 	}
