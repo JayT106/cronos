@@ -164,7 +164,7 @@ replace (
 
 	github.com/tendermint/tm-db => github.com/jayt106/tm-db v0.6.8-0.20220721184108-429f01da303a
 
-	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220728021344-e0b20ebd629d
+	github.com/tharsis/ethermint => github.com/jayt106/ethermint v0.10.4-0.20220728030715-cfd7b440b0b0
 
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )
