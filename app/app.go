@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -749,9 +750,12 @@ func New(
 	}
 
 	if loadLatest {
+		ts := time.Now()
 		if err := app.LoadLatestVersion(); err != nil {
 			tmos.Exit(err.Error())
 		}
+		te := time.Since(ts)
+		fmt.Printf("Loaded latest version in %s\n", te)
 	}
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
