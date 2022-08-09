@@ -643,12 +643,8 @@ github.com/influxdata/tdigest v0.0.0-20181121200506-bf2b5ad3c0a9/go.mod h1:Js0mq
 github.com/influxdata/usage-client v0.0.0-20160829180054-6d3895376368/go.mod h1:Wbbw6tYNvwa5dlB6304Sd+82Z3f7PmVZHVKU637d4po=
 github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458 h1:6OvNmYgJyexcZ3pYbTI9jWx5tHo1Dee/tWbLMfPe2TA=
 github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
-github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727235023-cbb9157938ab h1:zWAQ/I7vRWAJA4nmtljey7zYLY7+EEow38hm2IHnohw=
-github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220727235023-cbb9157938ab/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
-github.com/jayt106/ethermint v0.10.4-0.20220729181913-d575da832e08 h1:65l333ljaB7E37YeCR+OjHOlsGJf2F4hWBqmre6+k68=
-github.com/jayt106/ethermint v0.10.4-0.20220729181913-d575da832e08/go.mod h1:ZrI6YWBYgdUKQYa02jt6KMEEEEHLW+gY+iTXu1BisPo=
-github.com/jayt106/ethermint v0.10.4-0.20220729183753-8f94d9d7bd9e h1:aIwAvTRs+GD5LN2u4yLMttuUqPyuXfKq7nfE+9/6ewM=
-github.com/jayt106/ethermint v0.10.4-0.20220729183753-8f94d9d7bd9e/go.mod h1:ZrI6YWBYgdUKQYa02jt6KMEEEEHLW+gY+iTXu1BisPo=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220809195734-2b0a9553fe22 h1:iZFp6n2yoTRZTQ2ErnfaRoRExLrI1nTzZhllWh3S9gk=
+github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220809195734-2b0a9553fe22/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
 github.com/jayt106/ethermint v0.10.4-0.20220729190509-c21f7ab0799a h1:2GhifdXhyT70/nyh99RBTiU5Zi9qBmmycZOl26lhyVU=
 github.com/jayt106/ethermint v0.10.4-0.20220729190509-c21f7ab0799a/go.mod h1:ZrI6YWBYgdUKQYa02jt6KMEEEEHLW+gY+iTXu1BisPo=
 github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1 h1:VlfvDm+AVwCSFWG/C8YtOhYoYDdzcdXwx2epyxWzRpg=
