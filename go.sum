@@ -645,8 +645,8 @@ github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458 h1:6OvNmYgJye
 github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220809195734-2b0a9553fe22 h1:iZFp6n2yoTRZTQ2ErnfaRoRExLrI1nTzZhllWh3S9gk=
 github.com/jayt106/cosmos-sdk v0.43.0-rc2.0.20220809195734-2b0a9553fe22/go.mod h1:pC/DOWwIybfvSyHnRZsYXAf2/G2hBvPjmJfyD+Ld5cc=
-github.com/jayt106/ethermint v0.10.4-0.20220812191454-ffe0ae930269 h1:viQrsQd7QD6CyUVrt6430DJyUTSgB2X+ZoFU8ylHkyA=
-github.com/jayt106/ethermint v0.10.4-0.20220812191454-ffe0ae930269/go.mod h1:ZrI6YWBYgdUKQYa02jt6KMEEEEHLW+gY+iTXu1BisPo=
+github.com/jayt106/ethermint v0.10.4-0.20220830193846-6522c4ed88e9 h1:l0uGpr10xQq4Z7a+C60mB5SJvjpAPY3ER144W/bgF60=
+github.com/jayt106/ethermint v0.10.4-0.20220830193846-6522c4ed88e9/go.mod h1:ZrI6YWBYgdUKQYa02jt6KMEEEEHLW+gY+iTXu1BisPo=
 github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1 h1:VlfvDm+AVwCSFWG/C8YtOhYoYDdzcdXwx2epyxWzRpg=
 github.com/jayt106/gorocksdb v1.2.1-0.20220520155701-7f98b46fd4c1/go.mod h1:aaKvKItm514hKfNJpUJXnnOWeBnk2GL4+Qw9NHizILw=
 github.com/jayt106/gravity-bridge/module v0.3.12 h1:QumHzr9H3SZRiDYxe9IhgZ9qR1oFGSa81iowoTiwceM=
