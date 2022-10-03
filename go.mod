@@ -163,7 +163,7 @@ replace (
 
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-	github.com/tendermint/tendermint => github.com/tendermint/tendermint v0.34.20
+	github.com/tendermint/tendermint => github.com/jayt106/tendermint v0.34.11-0.20221003201217-7bd5d6f23bcb
 
 	github.com/tharsis/ethermint => github.com/crypto-org-chain/ethermint v0.11.1-cronos
 
