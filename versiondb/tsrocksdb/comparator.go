@@ -19,8 +19,14 @@ func CreateTSComparator() *grocksdb.Comparator {
 //
 // NOTICE: the behavior must be identical to rocksdb builtin comparator "leveldb.BytewiseComparator.u64ts".
 func compareTS(bz1, bz2 []byte) int {
-	ts1 := binary.LittleEndian.Uint64(bz1)
-	ts2 := binary.LittleEndian.Uint64(bz2)
+	var ts1, ts2 uint64
+	// Handle short slices - treat them as zero timestamp
+	if len(bz1) >= TimestampSize {
+		ts1 = binary.LittleEndian.Uint64(bz1)
+	}
+	if len(bz2) >= TimestampSize {
+		ts2 = binary.LittleEndian.Uint64(bz2)
+	}
 	switch {
 	case ts1 < ts2:
 		return -1
