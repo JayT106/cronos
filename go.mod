@@ -63,7 +63,6 @@ require (
 	cosmossdk.io/x/tx v0.14.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
-	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DataDog/datadog-go v4.8.3+incompatible // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0 // indirect
@@ -341,9 +340,9 @@ require (
 
 replace (
 	// JayT106 cosmos-sdk fork with CometBFT v0.39 support
-	cosmossdk.io/store => github.com/JayT106/cosmos-sdk/store v0.0.0-20260127200514-ceb3437bf583
-	cosmossdk.io/x/tx => github.com/JayT106/cosmos-sdk/x/tx v0.0.0-20260127200514-ceb3437bf583
-	github.com/cosmos/cosmos-sdk => github.com/JayT106/cosmos-sdk v0.0.0-20260127200514-ceb3437bf583
+	cosmossdk.io/store => github.com/JayT106/cosmos-sdk/store v0.0.0-20260128192949-dc2423f535c3
+	cosmossdk.io/x/tx => github.com/JayT106/cosmos-sdk/x/tx v0.0.0-20260128192949-dc2423f535c3
+	github.com/cosmos/cosmos-sdk => github.com/JayT106/cosmos-sdk v0.0.0-20260128192949-dc2423f535c3
 )
 
 replace (
@@ -356,7 +355,7 @@ replace (
 	// Use cosmos keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 	// CometBFT v0.39 - JayT106 fork with merge-upstream branch
-	github.com/cometbft/cometbft => github.com/JayT106/cometbft v0.0.0-20260123214422-944d05ae8278
+	github.com/cometbft/cometbft => github.com/JayT106/cometbft v0.0.0-20260128182736-215960fd03bb
 	// solves bug on pruning "version does not exist"
 	github.com/cosmos/iavl => github.com/cosmos/iavl v1.2.6
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
@@ -365,7 +364,7 @@ replace (
 	// release/v1.15
 	github.com/ethereum/go-ethereum => github.com/crypto-org-chain/go-ethereum v1.10.20-0.20250815065500-a4fbafcae0dd
 	// release/v0.22.x
-	github.com/evmos/ethermint => github.com/JayT106/ethermint v0.4.2-0.20260128012932-8dc4e286c1f3
+	github.com/evmos/ethermint => github.com/JayT106/ethermint v0.4.2-0.20260128194725-5c1f85c03f7c
 	// Fix upstream GHSA-h395-qcrw-5vmq and GHSA-3vp4-m3rf-835h vulnerabilities.
 	// TODO Remove it: https://github.com/cosmos/cosmos-sdk/issues/10409
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.0
