@@ -13,7 +13,7 @@
 let
   version = "v1.6.2";
   pname = "cronosd";
-  tags = [
+  tagList = [
     "ledger"
     "netgo"
     network
@@ -22,11 +22,12 @@ let
     "pebbledb"
     "objstore"
   ] ++ lib.optionals nativeByteOrder [ "nativebyteorder" ];
+  tags = lib.concatStringsSep "," tagList;
   ldflags = lib.concatStringsSep "\n" ([
     "-X github.com/cosmos/cosmos-sdk/version.Name=cronos"
     "-X github.com/cosmos/cosmos-sdk/version.AppName=${pname}"
     "-X github.com/cosmos/cosmos-sdk/version.Version=${version}"
-    "-X github.com/cosmos/cosmos-sdk/version.BuildTags=${lib.concatStringsSep "," tags}"
+    "-X github.com/cosmos/cosmos-sdk/version.BuildTags=${tags}"
     "-X github.com/cosmos/cosmos-sdk/version.Commit=${rev}"
   ]);
   buildInputs = [ rocksdb ];

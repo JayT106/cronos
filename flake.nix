@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     nix-bundle-exe = {
       url = "github:3noch/nix-bundle-exe";
@@ -83,7 +83,11 @@
         gomod2nix.overlays.default
         (import ./testground/benchmark/overlay.nix)
         (final: super: {
-          go = super.go_1_23;
+          go = super.go_1_25 or super.go_1_24 or super.go_1_23;
+          rustPlatform = super.rustPlatform // {
+            # Backwards compat for poetry2nix overrides on nixpkgs 25.05+.
+            fetchCargoTarball = args: super.rustPlatform.fetchCargoVendor args;
+          };
           test-env = final.callPackage ./nix/testenv.nix { };
           cronos-matrix = final.callPackage ./nix/cronos-matrix.nix {
             inherit rev;
