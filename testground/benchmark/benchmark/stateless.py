@@ -26,7 +26,7 @@ from .peer import (
     patch_configs,
 )
 from .stats import dump_block_stats
-from .topology import connect_all
+from .topology import bootstrap_peers, connect_all
 from .types import PeerPacket
 from .utils import Tee, block_height, block_txs, wait_for_block, wait_for_port
 
@@ -126,7 +126,7 @@ def _gen(
     # write genesis file and patch config files
     for i in range(validators):
         patch_configs_local(
-            peers, genesis, outdir, VALIDATOR_GROUP, i, config_patch, app_patch
+            peers, genesis, outdir, VALIDATOR_GROUP, i, i, config_patch, app_patch
         )
     for i in range(fullnodes):
         patch_configs_local(
@@ -135,6 +135,7 @@ def _gen(
             outdir,
             FULLNODE_GROUP,
             i,
+            i + validators,
             config_patch,
             app_patch,
         )
@@ -400,13 +401,15 @@ def patch_configs_local(
     outdir: Path,
     group: str,
     i: int,
+    global_seq: int,
     config_patch,
     app_patch,
 ):
     home = outdir / group / str(i)
     (home / "config" / "genesis.json").write_text(json.dumps(genesis))
-    p2p_peers = connect_all(peers[i], peers)
-    patch_configs(home, p2p_peers, config_patch, app_patch)
+    p2p_peers = connect_all(peers[global_seq], peers)
+    lp2p_bootstrap = bootstrap_peers(peers[global_seq], peers)
+    patch_configs(home, p2p_peers, config_patch, app_patch, lp2p_bootstrap)
 
 
 def node_index() -> int:

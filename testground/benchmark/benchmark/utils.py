@@ -1,3 +1,4 @@
+import base64
 import json
 import socket
 import time
@@ -13,9 +14,61 @@ from hexbytes import HexBytes
 from web3._utils.transactions import fill_nonce, fill_transaction_defaults
 
 DEFAULT_DENOM = "basecro"
+
+_BASE58_ALPHABET = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def _base58_encode(data: bytes) -> str:
+    """Encode bytes to base58btc string."""
+    leading_zeros = 0
+    for byte in data:
+        if byte == 0:
+            leading_zeros += 1
+        else:
+            break
+    num = int.from_bytes(data, "big")
+    result = bytearray()
+    while num > 0:
+        num, remainder = divmod(num, 58)
+        result.append(_BASE58_ALPHABET[remainder])
+    result.extend(b"1" * leading_zeros)
+    return result[::-1].decode("ascii")
+
+
+def libp2p_peer_id(home: Path) -> str:
+    """Compute the libp2p peer ID from a CometBFT node_key.json file.
+
+    The libp2p peer ID is the base58btc encoding of an identity multihash
+    wrapping the protobuf-encoded ed25519 public key.
+    """
+    node_key = json.loads((home / "config" / "node_key.json").read_text())
+    priv_key_bytes = base64.b64decode(node_key["priv_key"]["value"])
+    # ed25519 private key is 64 bytes: 32-byte seed + 32-byte public key
+    pubkey = priv_key_bytes[32:]
+    # protobuf: field 1 (KeyType=Ed25519=1), field 2 (Data=pubkey)
+    protobuf = b"\x08\x01\x12\x20" + pubkey
+    # identity multihash: code=0x00, length=36
+    multihash = b"\x00\x24" + protobuf
+    return _base58_encode(multihash)
+
+
 CRONOS_ADDRESS_PREFIX = "crc"
 LOCAL_RPC = "http://127.0.0.1:26657"
 LOCAL_JSON_RPC = "http://127.0.0.1:8545"
+
+
+def _toml_value(v):
+    """Convert Python values to tomlkit types where needed."""
+    if isinstance(v, list) and v and isinstance(v[0], dict):
+        arr = tomlkit.array()
+        arr.multiline(True)
+        for item in v:
+            t = tomlkit.inline_table()
+            for ik, iv in item.items():
+                t.append(ik, iv)
+            arr.append(t)
+        return arr
+    return v
 
 
 def patch_toml_doc(doc, patch):
@@ -23,7 +76,7 @@ def patch_toml_doc(doc, patch):
         if isinstance(v, dict):
             patch_toml_doc(doc.setdefault(k, {}), v)
         else:
-            doc[k] = v
+            doc[k] = _toml_value(v)
 
 
 def patch_toml(path: Path, patch):

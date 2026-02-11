@@ -5,7 +5,7 @@
     "fullnodes": 0,
     "batch_size": 100,
     "validator_generate_load": true,
-    "num_accounts": 10000,
+    "num_accounts": 1000,
     "num_txs": 5,
     "num_idle": 20,
     "config_patch": {
@@ -15,7 +15,12 @@
       "consensus": {
         "timeout_commit": "20ms"
       },
-      "db_backend": "rocksdb"
+      "db_backend": "rocksdb",
+      "p2p": {
+        "libp2p": {
+          "enabled": true
+        }
+      }
     },
     "app_patch": {
       "async-check-tx": true,

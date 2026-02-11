@@ -10,10 +10,6 @@ std.manifestYamlDoc({
       environment: {
         JOB_COMPLETION_INDEX: i,
       },
-      sysctls: {
-        'net.core.rmem_max': 8441037,
-        'net.core.wmem_max': 8441037,
-      },
     }
     for i in std.range(0, std.extVar('nodes') - 1)
   },

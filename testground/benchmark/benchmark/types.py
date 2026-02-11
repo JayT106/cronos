@@ -28,3 +28,4 @@ class PeerPacket(BaseModel):
     peer_id: str
     accounts: List[GenesisAccount]
     gentx: Optional[dict] = None
+    libp2p_id: Optional[str] = None

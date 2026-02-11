@@ -15,6 +15,7 @@ from .utils import (
     bech32_to_eth,
     eth_to_bech32,
     gen_account,
+    libp2p_peer_id,
     merge_genesis,
     patch_genesis,
     patch_toml,
@@ -76,11 +77,13 @@ def init_node(
 
     node_id = cli("comet", "show-node-id", **default_kwargs)
     peer_id = f"{node_id}@{ip}:26656"
+    lp2p_id = libp2p_peer_id(home)
     peer = PeerPacket(
         ip=str(ip),
         node_id=node_id,
         peer_id=peer_id,
         accounts=accounts,
+        libp2p_id=lp2p_id,
     )
 
     if group == VALIDATOR_GROUP:
@@ -134,7 +137,13 @@ def gen_genesis(
     )
 
 
-def patch_configs(home: Path, peers: str, config_patch: dict, app_patch: dict):
+def patch_configs(
+    home: Path,
+    peers: str,
+    config_patch: dict,
+    app_patch: dict,
+    bootstrap_peers: List[dict] = None,
+):
     default_config_patch = {
         "db_backend": "rocksdb",
         "p2p": {"addr_book_strict": False},
@@ -161,11 +170,14 @@ def patch_configs(home: Path, peers: str, config_patch: dict, app_patch: dict):
         "json-rpc": {"enable-indexer": True},
     }
     # update persistent_peers and other configs in config.toml
+    p2p_patch = {"persistent_peers": peers}
+    if bootstrap_peers is not None:
+        p2p_patch["libp2p"] = {"bootstrap_peers": bootstrap_peers}
     config_patch = jsonmerge.merge(
         default_config_patch,
         jsonmerge.merge(
             config_patch,
-            {"p2p": {"persistent_peers": peers}},
+            {"p2p": p2p_patch},
         ),
     )
     app_patch = jsonmerge.merge(default_app_patch, app_patch)

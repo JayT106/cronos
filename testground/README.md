@@ -291,12 +291,33 @@ $ nix run github:crypto-org-chain/cronos#stateless-testcase patchimage cronos-te
 
 ## Run With Docker Compose
 
+### UDP Buffer Size for QUIC
+
+CometBFT uses QUIC for peer-to-peer transport, which requires larger UDP buffer sizes (`net.core.rmem_max` and `net.core.wmem_max`). These are host-level sysctls that cannot be set per-container via Docker's `sysctls` directive on Docker Desktop or Colima — attempting to do so will fail with:
+
+```
+open /proc/sys/net/core/rmem_max: no such file or directory
+```
+
+You must set them on the Docker Desktop VM before starting the containers:
+
+```bash
+docker run --rm --privileged --net=host --pid=host alpine \
+  nsenter -t 1 -n sysctl -w net.core.rmem_max=8441037 net.core.wmem_max=8441037
+```
+
+> **Note:** These values are lost when Docker Desktop restarts. Run the command again after a restart.
+
+### Start Containers
+
 ```bash
 $ mkdir /tmp/outputs
-$ jsonnet -S testground/benchmark/compositions/docker-compose.jsonnet \
-  --ext-str outputs=/tmp/colima \
-  --ext-code nodes=3 \
-  | docker-compose -f /dev/stdin up --remove-orphans --force-recreate
+$ docker run --rm --privileged --net=host --pid=host alpine \
+    nsenter -t 1 -n sysctl -w net.core.rmem_max=8441037 net.core.wmem_max=8441037 \
+  && jsonnet -S testground/benchmark/compositions/docker-compose.jsonnet \
+    --ext-str outputs=/tmp/colima \
+    --ext-code nodes=3 \
+    | docker compose -f /dev/stdin up --remove-orphans --force-recreate
 ```
 
 It'll collect the node data files to the `/tmp/outputs` directory.
