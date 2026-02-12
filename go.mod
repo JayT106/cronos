@@ -336,11 +336,11 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-// JayT106 cosmos-sdk fork with CometBFT v0.39 support
+// cosmos-sdk - local development
 replace (
-	cosmossdk.io/store => github.com/JayT106/cosmos-sdk/store v0.0.0-20260128192949-dc2423f535c3
-	cosmossdk.io/x/tx => github.com/JayT106/cosmos-sdk/x/tx v0.0.0-20260128192949-dc2423f535c3
-	github.com/cosmos/cosmos-sdk => github.com/JayT106/cosmos-sdk v0.0.0-20260128192949-dc2423f535c3
+	cosmossdk.io/store => /Users/jaytseng/workspace/cosmos-sdk/store
+	cosmossdk.io/x/tx => /Users/jaytseng/workspace/cosmos-sdk/x/tx
+	github.com/cosmos/cosmos-sdk => /Users/jaytseng/workspace/cosmos-sdk
 )
 
 replace (
@@ -352,8 +352,8 @@ replace (
 replace (
 	// Use cosmos keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-	// CometBFT v0.39 - JayT106 fork with merge-upstream branch
-	github.com/cometbft/cometbft => github.com/JayT106/cometbft v0.0.0-20260128182736-215960fd03bb
+	// CometBFT v0.39 - local development
+	github.com/cometbft/cometbft => /Users/jaytseng/workspace/cometbft
 	// solves bug on pruning "version does not exist"
 	github.com/cosmos/iavl => github.com/cosmos/iavl v1.2.6
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
@@ -362,7 +362,7 @@ replace (
 	// release/v1.15
 	github.com/ethereum/go-ethereum => github.com/crypto-org-chain/go-ethereum v1.10.20-0.20250815065500-a4fbafcae0dd
 	// release/v0.22.x
-	github.com/evmos/ethermint => github.com/JayT106/ethermint v0.4.2-0.20260207051009-0d9df38311c1
+	github.com/evmos/ethermint => /Users/jaytseng/workspace/ethermint
 	// Fix upstream GHSA-h395-qcrw-5vmq and GHSA-3vp4-m3rf-835h vulnerabilities.
 	// TODO Remove it: https://github.com/cosmos/cosmos-sdk/issues/10409
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.0

@@ -106,13 +106,12 @@ RUN if [ -f nix/testground-cronosd.patch ]; then \
     fi
 
 # Build cronosd
-# Use -mod=mod to allow dependency resolution (vendor may be out of sync)
 ARG VERSION=docker
 ARG COMMIT=docker
 ENV CGO_CFLAGS="-I/usr/include"
 ENV CGO_LDFLAGS="-L/usr/lib -lrocksdb -lstdc++ -lm -lz -lbz2 -lsnappy -llz4 -lzstd"
 RUN CGO_ENABLED=1 go build \
-    -mod=mod \
+    -mod=vendor \
     -tags "netgo objstore pebbledb rocksdb grocksdb_clean_link mainnet nativebyteorder" \
     -ldflags "-w -s -X github.com/cosmos/cosmos-sdk/version.Name=cronos \
               -X github.com/cosmos/cosmos-sdk/version.AppName=cronosd \
