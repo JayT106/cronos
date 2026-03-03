@@ -75,33 +75,36 @@ func (ts *ExtTxSelector) SelectTxForProposalFast(ctx context.Context, txs [][]by
 	return ts.TxSelector.SelectTxForProposalFast(ctx, txs)
 }
 
-// CLOBTxSelector is a TxSelector that reserves a configurable fraction of block gas
-// for CLOB (MsgSettleBatch) transactions. CLOB txs are expected to appear first in
-// the SelectBy iteration order (via CLOBMempool). Unused CLOB gas quota rolls over
-// to regular transactions so no block space is wasted.
+// CLOBTxSelector is a TxSelector that reserves a configurable fraction of block
+// resources (both gas and bytes) for CLOB (MsgSettleBatch) transactions. CLOB txs
+// are expected to appear first in the SelectBy iteration order (via CLOBMempool).
+// Unused CLOB quota rolls over to regular transactions so no block space is wasted.
 type CLOBTxSelector struct {
-	clobGasRatio   float64
-	clobGasLimit   uint64
-	clobGasUsed    uint64
-	maxBlockGas    uint64
-	regularGasUsed uint64
-	totalTxBytes   uint64
-	selectedTxs    [][]byte
-	initialized    bool
-	isCLOBTx       func(sdk.Tx) bool
-	validateTx     func(sdk.Tx, []byte) error
-	txDecoder      sdk.TxDecoder
+	clobBlockRatio   float64
+	clobGasLimit     uint64
+	clobGasUsed      uint64
+	maxBlockGas      uint64
+	regularGasUsed   uint64
+	clobBytesLimit   uint64
+	clobBytesUsed    uint64
+	regularBytesUsed uint64
+	maxTxBytes       uint64
+	selectedTxs      [][]byte
+	initialized      bool
+	isCLOBTx         func(sdk.Tx) bool
+	validateTx       func(sdk.Tx, []byte) error
+	txDecoder        sdk.TxDecoder
 }
 
 var _ baseapp.TxSelector = (*CLOBTxSelector)(nil)
 
 // NewCLOBTxSelector creates a CLOBTxSelector.
-func NewCLOBTxSelector(clobGasRatio float64, isCLOBTx func(sdk.Tx) bool, validateTx func(sdk.Tx, []byte) error, txDecoder sdk.TxDecoder) *CLOBTxSelector {
+func NewCLOBTxSelector(clobBlockRatio float64, isCLOBTx func(sdk.Tx) bool, validateTx func(sdk.Tx, []byte) error, txDecoder sdk.TxDecoder) *CLOBTxSelector {
 	return &CLOBTxSelector{
-		clobGasRatio: clobGasRatio,
-		isCLOBTx:     isCLOBTx,
-		validateTx:   validateTx,
-		txDecoder:    txDecoder,
+		clobBlockRatio: clobBlockRatio,
+		isCLOBTx:       isCLOBTx,
+		validateTx:     validateTx,
+		txDecoder:      txDecoder,
 	}
 }
 
@@ -112,9 +115,10 @@ func (ts *CLOBTxSelector) SelectedTxs(_ context.Context) [][]byte {
 }
 
 func (ts *CLOBTxSelector) Clear() {
-	ts.totalTxBytes = 0
 	ts.clobGasUsed = 0
 	ts.regularGasUsed = 0
+	ts.clobBytesUsed = 0
+	ts.regularBytesUsed = 0
 	ts.selectedTxs = ts.selectedTxs[:0]
 	ts.initialized = false
 }
@@ -133,44 +137,53 @@ func (ts *CLOBTxSelector) SelectTxForProposal(_ context.Context, maxTxBytes, max
 		return false
 	}
 
-	// Lazy-init gas limits from the first call's maxBlockGas.
+	// Lazy-init gas and byte limits from the first call.
 	if !ts.initialized {
 		ts.maxBlockGas = maxBlockGas
+		ts.maxTxBytes = maxTxBytes
 		if maxBlockGas > 0 {
-			ts.clobGasLimit = uint64(ts.clobGasRatio * float64(maxBlockGas))
+			ts.clobGasLimit = uint64(ts.clobBlockRatio * float64(maxBlockGas))
 		}
+		ts.clobBytesLimit = uint64(ts.clobBlockRatio * float64(maxTxBytes))
 		ts.initialized = true
 	}
 
 	txSize := uint64(cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{txBz}))
 
-	// Stop if this tx won't fit in the remaining byte budget.
-	if txSize+ts.totalTxBytes > maxTxBytes {
-		return true
-	}
-
-	if maxBlockGas > 0 {
-		if ts.isCLOBTx(memTx) {
-			// CLOB gas budget exceeded: skip this tx but keep iterating.
-			if ts.clobGasUsed+gasWanted > ts.clobGasLimit {
-				return false
-			}
+	if ts.isCLOBTx(memTx) {
+		// CLOB byte budget exceeded: skip this tx but keep iterating.
+		if ts.clobBytesUsed+txSize > ts.clobBytesLimit {
+			return false
+		}
+		// CLOB gas budget exceeded: skip this tx but keep iterating.
+		if maxBlockGas > 0 && ts.clobGasUsed+gasWanted > ts.clobGasLimit {
+			return false
+		}
+		ts.clobBytesUsed += txSize
+		if maxBlockGas > 0 {
 			ts.clobGasUsed += gasWanted
-		} else {
-			// Rollover: regular txs may use any unused CLOB gas quota.
-			effectiveRegularLimit := ts.maxBlockGas - ts.clobGasUsed
-			if ts.regularGasUsed+gasWanted > effectiveRegularLimit {
+		}
+	} else {
+		// Rollover: regular txs may use any unused CLOB byte/gas quota.
+		effectiveRegularBytesLimit := ts.maxTxBytes - ts.clobBytesUsed
+		if ts.regularBytesUsed+txSize > effectiveRegularBytesLimit {
+			return true
+		}
+		if maxBlockGas > 0 {
+			effectiveRegularGasLimit := ts.maxBlockGas - ts.clobGasUsed
+			if ts.regularGasUsed+gasWanted > effectiveRegularGasLimit {
 				return true
 			}
 			ts.regularGasUsed += gasWanted
 		}
+		ts.regularBytesUsed += txSize
 	}
 
-	ts.totalTxBytes += txSize
 	ts.selectedTxs = append(ts.selectedTxs, txBz)
 
+	totalBytes := ts.clobBytesUsed + ts.regularBytesUsed
 	totalGas := ts.clobGasUsed + ts.regularGasUsed
-	return ts.totalTxBytes >= maxTxBytes || (maxBlockGas > 0 && totalGas >= maxBlockGas)
+	return totalBytes >= ts.maxTxBytes || (maxBlockGas > 0 && totalGas >= maxBlockGas)
 }
 
 // SelectTxForProposalFast returns txs unchanged; only called for NoOpMempool path.

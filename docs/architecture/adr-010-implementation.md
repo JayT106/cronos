@@ -11,7 +11,7 @@ maintaining or extending this code.
 | `app/clob_mempool.go` | `CLOBMempool` type + `isCLOBTx` helper |
 | `app/proposal.go` | `CLOBTxSelector` (added alongside existing `ExtTxSelector`) |
 | `app/app.go` | Three-way mempool init + conditional selector wiring |
-| `cmd/cronosd/config/config.go` | `CLOBGasRatio` config field |
+| `cmd/cronosd/config/config.go` | `CLOBBlockRatio` config field |
 | `cmd/cronosd/config/toml.go` | TOML template entry |
 | `app/clob_mempool_test.go` | CLOBMempool unit tests + shared test helpers |
 | `app/proposal_test.go` | CLOBTxSelector unit tests |
@@ -72,17 +72,20 @@ regular pool's iterator is returned directly (no wrapping overhead).
 
 ```go
 type CLOBTxSelector struct {
-    clobGasRatio   float64       // configured ratio [0.0, 1.0]
-    clobGasLimit   uint64        // clobGasRatio × maxBlockGas (lazy-init)
-    clobGasUsed    uint64        // running total of accepted CLOB gas
-    maxBlockGas    uint64        // from ConsensusParams (lazy-init)
-    regularGasUsed uint64        // running total of accepted regular gas
-    totalTxBytes   uint64        // running total of protobuf-encoded tx bytes
-    selectedTxs    [][]byte      // accepted tx bytes for the proposal
-    initialized    bool          // lazy-init flag (reset by Clear)
-    isCLOBTx       func(sdk.Tx) bool
-    validateTx     func(sdk.Tx, []byte) error
-    txDecoder      sdk.TxDecoder
+    clobBlockRatio   float64       // configured ratio [0.0, 1.0]
+    clobGasLimit     uint64        // clobBlockRatio × maxBlockGas (lazy-init)
+    clobGasUsed      uint64        // running total of accepted CLOB gas
+    maxBlockGas      uint64        // from ConsensusParams (lazy-init)
+    regularGasUsed   uint64        // running total of accepted regular gas
+    clobBytesLimit   uint64        // clobBlockRatio × maxTxBytes (lazy-init)
+    clobBytesUsed    uint64        // running total of accepted CLOB tx bytes
+    regularBytesUsed uint64        // running total of accepted regular tx bytes
+    maxTxBytes       uint64        // from PrepareProposal request (lazy-init)
+    selectedTxs      [][]byte      // accepted tx bytes for the proposal
+    initialized      bool          // lazy-init flag (reset by Clear)
+    isCLOBTx         func(sdk.Tx) bool
+    validateTx       func(sdk.Tx, []byte) error
+    txDecoder        sdk.TxDecoder
 }
 ```
 
@@ -91,51 +94,54 @@ type CLOBTxSelector struct {
 ```
 1. Decode tx if memTx is nil (guard: skip if decoder returns nil)
 2. Validate tx via validateTx (blocklist) → skip on error (return false)
-3. Lazy-init clobGasLimit and maxBlockGas on first call
+3. Lazy-init clobGasLimit, clobBytesLimit, maxBlockGas, maxTxBytes on first call
 4. Compute txSize via ComputeProtoSizeForTxs
-5. Check byte budget: txSize + totalTxBytes > maxTxBytes → halt (return true)
-6. Gas checks (skipped when maxBlockGas = 0):
-   a. CLOB tx: clobGasUsed + gasWanted > clobGasLimit → skip (return false)
-              else: clobGasUsed += gasWanted
-   b. Regular tx: effectiveRegularLimit = maxBlockGas − clobGasUsed
-                  regularGasUsed + gasWanted > effectiveRegularLimit → halt (return true)
-                  else: regularGasUsed += gasWanted
-7. Add tx: totalTxBytes += txSize, append txBz
-8. Return: totalTxBytes >= maxTxBytes || totalGas >= maxBlockGas
+5. If CLOB tx:
+   a. clobBytesUsed + txSize > clobBytesLimit → skip (return false)
+   b. clobGasUsed + gasWanted > clobGasLimit (when maxBlockGas > 0) → skip (return false)
+   c. Accept: clobBytesUsed += txSize, clobGasUsed += gasWanted
+6. If regular tx:
+   a. effectiveRegularBytesLimit = maxTxBytes − clobBytesUsed
+      regularBytesUsed + txSize > effectiveRegularBytesLimit → halt (return true)
+   b. effectiveRegularGasLimit = maxBlockGas − clobGasUsed (when maxBlockGas > 0)
+      regularGasUsed + gasWanted > effectiveRegularGasLimit → halt (return true)
+   c. Accept: regularBytesUsed += txSize, regularGasUsed += gasWanted
+7. Append txBz to selectedTxs
+8. Return: totalBytes >= maxTxBytes || totalGas >= maxBlockGas
 ```
 
 ### Return Value Semantics
 
 | Return | Meaning | When |
 |--------|---------|------|
-| `false` | Continue iterating | Tx accepted, or tx skipped (CLOB over quota, validation error) |
-| `true` | Stop iterating | Byte budget exhausted, regular gas limit hit, or block full |
+| `false` | Continue iterating | Tx accepted, or tx skipped (CLOB over gas/byte quota, validation error) |
+| `true` | Stop iterating | Regular byte/gas limit hit, or block full |
 
 The distinction matters: skipping a CLOB tx returns `false` (continue) so
 smaller CLOB txs or regular txs can still be selected. Exceeding the regular
-gas limit returns `true` (halt) because no further regular txs can fit.
+gas or byte limit returns `true` (halt) because no further regular txs can fit.
 
 ### `Clear`
 
 Called via `defer` at the end of each `PrepareProposalHandler` invocation.
-Resets all counters and sets `initialized = false` so the next block
-recomputes limits from the fresh `maxBlockGas` in `ConsensusParams`.
+Resets all counters (gas and byte) and sets `initialized = false` so the next
+block recomputes limits from the fresh `maxBlockGas` and `maxTxBytes`.
 
 ## Wiring in `app/app.go`
 
 ### Config Reading
 
 ```go
-clobGasRatio := cast.ToFloat64(appOpts.Get(FlagCLOBGasRatio))
-if clobGasRatio > 1.0 {
-    clobGasRatio = 1.0  // clamp to prevent uint64 underflow
+clobBlockRatio := cast.ToFloat64(appOpts.Get(FlagCLOBBlockRatio))
+if clobBlockRatio > 1.0 {
+    clobBlockRatio = 1.0  // clamp to prevent uint64 underflow
 }
 ```
 
 ### Three-Way Mempool Init
 
 ```go
-if mempoolMaxTxs >= 0 && feeBump >= 0 && clobGasRatio > 0 {
+if mempoolMaxTxs >= 0 && feeBump >= 0 && clobBlockRatio > 0 {
     mpool = NewCLOBMempool(...)
 } else if mempoolMaxTxs >= 0 && feeBump >= 0 {
     mpool = mempool.NewPriorityMempool(...)  // existing path
@@ -163,11 +169,11 @@ even if config parameters create unexpected combinations.
 
 ```toml
 [cronos]
-# Fraction of block gas reserved for CLOB (MsgSettleBatch) transactions [0.0 to 1.0].
+# Fraction of block resources (gas and bytes) reserved for CLOB (MsgSettleBatch) transactions [0.0 to 1.0].
 # CLOB transactions are placed first in every block.
-# Unused CLOB gas quota rolls over to regular EVM transactions.
+# Unused CLOB quota rolls over to regular EVM transactions.
 # Set to 0.0 to disable (default).
-clob-gas-ratio = 0.0
+clob-block-ratio = 0.0
 ```
 
 ### Recommended Values
@@ -175,7 +181,7 @@ clob-gas-ratio = 0.0
 | Scenario | Ratio | Effect |
 |----------|-------|--------|
 | CLOB disabled (default) | `0.0` | No CLOBMempool; uses standard PriorityNonceMempool |
-| Light CLOB usage | `0.1` | 10% of block gas reserved for settlement batches |
+| Light CLOB usage | `0.1` | 10% of block gas+bytes reserved for settlement batches |
 | Standard CLOB usage | `0.3` | 30% reserved; recommended starting point |
 | Heavy CLOB usage | `0.5` | 50% reserved; use when settlement volume is high |
 | CLOB-only chain | `1.0` | 100% reserved; regular txs only get unused CLOB capacity |
@@ -201,16 +207,19 @@ clob-gas-ratio = 0.0
 
 | Test | Scenario |
 |------|----------|
-| `TestCLOBTxSelectorCLOBGasLimit` | CLOB tx exceeding quota is skipped (not halted) |
+| `TestCLOBTxSelectorCLOBGasLimit` | CLOB tx exceeding gas quota is skipped (not halted) |
 | `TestCLOBTxSelectorRollover` | No CLOB txs: full block gas available to regular |
 | `TestCLOBTxSelectorMixed` | CLOB + regular txs filling block to exactly maxBlockGas |
-| `TestCLOBTxSelectorRegularGasExceeded` | Regular tx exceeding effective limit halts |
+| `TestCLOBTxSelectorRegularGasExceeded` | Regular tx exceeding effective gas limit halts |
 | `TestCLOBTxSelectorUnlimitedGas` | maxBlockGas=0: gas checks bypassed |
 | `TestCLOBTxSelectorValidationError` | Blocklist validation rejects tx (skip, not halt) |
 | `TestCLOBTxSelectorClear` | Clear resets all counters and initialized flag |
-| `TestCLOBTxSelectorBytesLimit` | tx exceeding byte budget halts |
+| `TestCLOBTxSelectorBytesLimit` | tx exceeding overall byte budget halts |
 | `TestCLOBTxSelectorCLOBRatioFull` | ratio=1.0: regular txs only get rollover |
 | `TestCLOBTxSelectorClearAndReuse` | Clear + re-init with different maxBlockGas |
+| `TestCLOBTxSelectorCLOBBytesLimit` | CLOB tx exceeding byte quota is skipped; regular tx accepted |
+| `TestCLOBTxSelectorBytesRollover` | No CLOB txs: full byte budget available to regular |
+| `TestCLOBTxSelectorMixedBytesAndGas` | CLOB tx rejected by bytes even when gas is available |
 
 ### Integration Tests (`app/clob_integration_test.go`)
 
@@ -257,12 +266,13 @@ func isCLOBTx(tx sdk.Tx) bool {
 
 ### Per-Type Gas Limits
 
-The current design has a single CLOB gas quota. To support multiple
+The current design has a single CLOB gas and byte quota. To support multiple
 categories (e.g., CLOB + DA), extend `CLOBTxSelector` with additional
-gas counters and detection functions. The rollover formula generalizes to:
+gas/byte counters and detection functions. The rollover formula generalizes to:
 
 ```
-effectiveRegularLimit = maxBlockGas − sum(categoryGasUsed)
+effectiveRegularGasLimit  = maxBlockGas − sum(categoryGasUsed)
+effectiveRegularBytesLimit = maxTxBytes  − sum(categoryBytesUsed)
 ```
 
 ### Separate MaxTx per Pool

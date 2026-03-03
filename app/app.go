@@ -181,7 +181,7 @@ const (
 
 	FlagDisableTxReplacement       = "cronos.disable-tx-replacement"
 	FlagDisableOptimisticExecution = "cronos.disable-optimistic-execution"
-	FlagCLOBGasRatio               = "cronos.clob-gas-ratio"
+	FlagCLOBBlockRatio             = "cronos.clob-block-ratio"
 )
 
 var Forks = []Fork{}
@@ -387,12 +387,12 @@ func New(
 	var mpool mempool.Mempool
 	mempoolMaxTxs := cast.ToInt(appOpts.Get(server.FlagMempoolMaxTxs))
 	feeBump := cast.ToInt64(appOpts.Get(FlagMempoolFeeBump))
-	clobGasRatio := cast.ToFloat64(appOpts.Get(FlagCLOBGasRatio))
-	if clobGasRatio > 1.0 {
-		clobGasRatio = 1.0
+	clobBlockRatio := cast.ToFloat64(appOpts.Get(FlagCLOBBlockRatio))
+	if clobBlockRatio > 1.0 {
+		clobBlockRatio = 1.0
 	}
-	if mempoolMaxTxs >= 0 && feeBump >= 0 && clobGasRatio > 0 {
-		logger.Info("NewCLOBMempool is enabled", "feebump", feeBump, "clobGasRatio", clobGasRatio)
+	if mempoolMaxTxs >= 0 && feeBump >= 0 && clobBlockRatio > 0 {
+		logger.Info("NewCLOBMempool is enabled", "feebump", feeBump, "clobBlockRatio", clobBlockRatio)
 		signerExtractor := evmapp.NewEthSignerExtractionAdapter(mempool.NewDefaultSignerExtractionAdapter())
 		txReplacement := func(op, np int64, oTx, nTx sdk.Tx) bool {
 			threshold := 100 + feeBump
@@ -425,7 +425,7 @@ func New(
 		defaultProposalHandler := baseapp.NewDefaultProposalHandlerFast(mpool, app)
 		if _, ok := mpool.(*CLOBMempool); ok {
 			defaultProposalHandler.SetTxSelector(NewCLOBTxSelector(
-				clobGasRatio,
+				clobBlockRatio,
 				isCLOBTx,
 				blockProposalHandler.ValidateTransaction,
 				txDecoder,

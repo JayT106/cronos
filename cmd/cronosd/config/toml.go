@@ -14,9 +14,9 @@ disable-tx-replacement = {{ .Cronos.DisableTxReplacement }}
 # Set to true to disable optimistic execution (not recommended on validator nodes).
 disable-optimistic-execution = {{ .Cronos.DisableOptimisticExecution }}
 
-# Fraction of block gas reserved for CLOB (MsgSettleBatch) transactions [0.0 to 1.0].
+# Fraction of block resources (gas and bytes) reserved for CLOB (MsgSettleBatch) transactions [0.0 to 1.0].
 # CLOB transactions are placed first in every block.
-# Unused CLOB gas quota rolls over to regular EVM transactions.
+# Unused CLOB quota rolls over to regular EVM transactions.
 # Set to 0.0 to disable (default).
-clob-gas-ratio = {{ .Cronos.CLOBGasRatio }}
+clob-block-ratio = {{ .Cronos.CLOBBlockRatio }}
 `

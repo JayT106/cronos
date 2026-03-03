@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -232,7 +233,8 @@ func TestCLOBTxSelectorClear(t *testing.T) {
 	require.False(t, sel.initialized)
 	require.Equal(t, uint64(0), sel.clobGasUsed)
 	require.Equal(t, uint64(0), sel.regularGasUsed)
-	require.Equal(t, uint64(0), sel.totalTxBytes)
+	require.Equal(t, uint64(0), sel.clobBytesUsed)
+	require.Equal(t, uint64(0), sel.regularBytesUsed)
 }
 
 func TestCLOBTxSelectorBytesLimit(t *testing.T) {
@@ -290,5 +292,68 @@ func TestCLOBTxSelectorClearAndReuse(t *testing.T) {
 	require.False(t, stop)
 	require.Equal(t, uint64(20_000_000), sel.maxBlockGas, "maxBlockGas should refresh after Clear")
 	require.Equal(t, uint64(6_000_000), sel.clobGasLimit, "clobGasLimit should be 0.3 × 20M")
+	require.Equal(t, uint64(300_000_000), sel.clobBytesLimit, "clobBytesLimit should be 0.3 × 1B")
 	require.Len(t, sel.SelectedTxs(ctx), 1)
+}
+
+func TestCLOBTxSelectorCLOBBytesLimit(t *testing.T) {
+	// Set maxTxBytes so clobBytesLimit < txSize but the overall budget can fit the tx.
+	txBz := []byte("tx")
+	txSize := uint64(cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{txBz}))
+	maxTxBytes := txSize * 2 // clobBytesLimit = 0.3 * 2*txSize ≈ 0.6*txSize < txSize
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	clobTx := makeSelectorTx(true)
+	regularTx := makeSelectorTx(false)
+
+	// CLOB tx: txSize > clobBytesLimit → skipped (not halted).
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, 0, clobTx, txBz, 0)
+	require.False(t, stop, "should skip (not halt) when CLOB tx exceeds byte quota")
+	require.Empty(t, sel.SelectedTxs(ctx))
+
+	// Regular tx: effectiveRegularBytesLimit = maxTxBytes - 0 = maxTxBytes → fits.
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, 0, regularTx, txBz, 0)
+	require.False(t, stop)
+	require.Len(t, sel.SelectedTxs(ctx), 1, "regular tx should be accepted despite CLOB byte limit")
+}
+
+func TestCLOBTxSelectorBytesRollover(t *testing.T) {
+	// When no CLOB txs are present, regular txs get the full byte budget.
+	txBz := []byte("tx")
+	txSize := uint64(cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{txBz}))
+	maxTxBytes := txSize * 3 // room for 3 txs total
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	regularTx := makeSelectorTx(false)
+
+	// No CLOB txs. effectiveRegularBytesLimit = maxTxBytes - 0 = maxTxBytes.
+	// First two regular txs should fit.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, 0, regularTx, txBz, 0)
+	require.False(t, stop)
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, 0, regularTx, txBz, 0)
+	require.False(t, stop)
+
+	// Third regular tx fills the budget exactly.
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, 0, regularTx, txBz, 0)
+	require.True(t, stop, "should halt: total bytes == maxTxBytes")
+	require.Len(t, sel.SelectedTxs(ctx), 3)
+}
+
+func TestCLOBTxSelectorMixedBytesAndGas(t *testing.T) {
+	// Verify that a CLOB tx can be rejected by bytes even when gas is available.
+	txBz := []byte("tx")
+	txSize := uint64(cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{txBz}))
+	// clobBytesLimit = 0.3 * 2*txSize < txSize → byte-limited
+	maxTxBytes := txSize * 2
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	clobTx := makeSelectorTx(true)
+
+	// CLOB tx has plenty of gas budget (10M * 0.3 = 3M > 1000) but not enough bytes.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, 10_000_000, clobTx, txBz, 1_000)
+	require.False(t, stop, "CLOB tx should be skipped due to byte limit, not gas")
+	require.Empty(t, sel.SelectedTxs(ctx))
 }

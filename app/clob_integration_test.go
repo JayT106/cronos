@@ -70,12 +70,12 @@ func newIntegrationCtx(maxBlockGas int64) sdk.Context {
 
 // buildCLOBProposalHandler constructs a CLOBMempool + CLOBTxSelector +
 // PrepareProposalHandler wired together for integration testing.
-func buildCLOBProposalHandler(clobGasRatio float64, verifier baseapp.ProposalTxVerifier) (*CLOBMempool, sdk.PrepareProposalHandler) {
+func buildCLOBProposalHandler(clobBlockRatio float64, verifier baseapp.ProposalTxVerifier) (*CLOBMempool, sdk.PrepareProposalHandler) {
 	mpool := NewCLOBMempool(100, testSignerExtractor{}, nil)
 
 	noopDecoder := func([]byte) (sdk.Tx, error) { return nil, nil }
 	noopValidate := func(sdk.Tx, []byte) error { return nil }
-	selector := NewCLOBTxSelector(clobGasRatio, isCLOBTx, noopValidate, noopDecoder)
+	selector := NewCLOBTxSelector(clobBlockRatio, isCLOBTx, noopValidate, noopDecoder)
 
 	handler := baseapp.NewDefaultProposalHandler(mpool, verifier)
 	handler.SetTxSelector(selector)

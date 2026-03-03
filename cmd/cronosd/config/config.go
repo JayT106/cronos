@@ -14,16 +14,17 @@ type CronosConfig struct {
 	DisableTxReplacement bool `mapstructure:"disable-tx-replacement"`
 	// Set to true to disable optimistic execution.
 	DisableOptimisticExecution bool `mapstructure:"disable-optimistic-execution"`
-	// CLOBGasRatio is the fraction of block gas reserved for CLOB (MsgSettleBatch) transactions.
-	// CLOB txs go first in every block, and unused quota rolls over to regular txs.
+	// CLOBBlockRatio is the fraction of block resources (gas and bytes) reserved for
+	// CLOB (MsgSettleBatch) transactions. CLOB txs go first in every block, and
+	// unused quota rolls over to regular txs.
 	// Range: [0.0, 1.0]. Set to 0.0 to disable.
-	CLOBGasRatio float64 `mapstructure:"clob-gas-ratio"`
+	CLOBBlockRatio float64 `mapstructure:"clob-block-ratio"`
 }
 
 func DefaultCronosConfig() CronosConfig {
 	return CronosConfig{
 		DisableTxReplacement:       false,
 		DisableOptimisticExecution: false,
-		CLOBGasRatio:               0.0,
+		CLOBBlockRatio:                 0.0,
 	}
 }
