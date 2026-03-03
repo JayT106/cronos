@@ -84,12 +84,12 @@ func newTestCLOBTxSelector(ratio float64, isCLOBFn func(sdk.Tx) bool) *CLOBTxSel
 }
 
 // makeSelectorTx returns a test tx identified by the isClob flag.
-// It reuses testTx / newCLOBTx / newRegularTx defined in clob_mempool_test.go.
+// CLOB txs use testSequencerAddr; regular txs use a different signer.
 func makeSelectorTx(isClob bool) sdk.Tx {
-	signer := sdk.AccAddress([]byte("proposaltestsigner__"))
 	if isClob {
-		return newCLOBTx(signer, 1)
+		return newCLOBTx(testSequencerAddr, 1)
 	}
+	signer := sdk.AccAddress([]byte("proposaltestsigner__"))
 	return newRegularTx(signer, 1)
 }
 
@@ -99,7 +99,7 @@ func TestCLOBTxSelectorCLOBGasLimit(t *testing.T) {
 		maxTxBytes  = 1_000_000_000 // high enough not to be the limit
 	)
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx) // 3M CLOB gas limit
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx) // 3M CLOB gas limit
 	ctx := context.Background()
 	txBz := []byte("tx")
 	clobTx := makeSelectorTx(true)
@@ -121,7 +121,7 @@ func TestCLOBTxSelectorRollover(t *testing.T) {
 		maxTxBytes  = 1_000_000_000
 	)
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	txBz := []byte("tx")
 	regularTx := makeSelectorTx(false)
@@ -143,7 +143,7 @@ func TestCLOBTxSelectorMixed(t *testing.T) {
 		maxTxBytes  = 1_000_000_000
 	)
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx) // 3M CLOB, 7M available for regular (with rollover)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx) // 3M CLOB, 7M available for regular (with rollover)
 	ctx := context.Background()
 	txBz := []byte("tx")
 	clobTx := makeSelectorTx(true)
@@ -165,7 +165,7 @@ func TestCLOBTxSelectorRegularGasExceeded(t *testing.T) {
 		maxTxBytes  = 1_000_000_000
 	)
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	txBz := []byte("tx")
 	clobTx := makeSelectorTx(true)
@@ -186,7 +186,7 @@ func TestCLOBTxSelectorUnlimitedGas(t *testing.T) {
 		maxTxBytes  = 1_000_000_000
 	)
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	txBz := []byte("tx")
 
@@ -206,7 +206,7 @@ func TestCLOBTxSelectorValidationError(t *testing.T) {
 		return nil
 	}
 	decoderFn := func([]byte) (sdk.Tx, error) { return nil, nil }
-	sel := NewCLOBTxSelector(0.3, isCLOBTx, validateFn, decoderFn)
+	sel := NewCLOBTxSelector(0.3, testIsCLOBTx, validateFn, decoderFn)
 	ctx := context.Background()
 
 	clobTx := makeSelectorTx(true)
@@ -221,7 +221,7 @@ func TestCLOBTxSelectorClear(t *testing.T) {
 		maxTxBytes  = 1_000_000_000
 	)
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	txBz := []byte("tx")
 
@@ -238,7 +238,7 @@ func TestCLOBTxSelectorClear(t *testing.T) {
 }
 
 func TestCLOBTxSelectorBytesLimit(t *testing.T) {
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 
 	// maxTxBytes is tiny (1 byte). ComputeProtoSizeForTxs always returns > 1
@@ -256,7 +256,7 @@ func TestCLOBTxSelectorCLOBRatioFull(t *testing.T) {
 
 	// ratio=1.0 → entire block reserved for CLOB; regular txs get zero budget
 	// unless CLOB quota is unused (rollover).
-	sel := newTestCLOBTxSelector(1.0, isCLOBTx)
+	sel := newTestCLOBTxSelector(1.0, testIsCLOBTx)
 	ctx := context.Background()
 	txBz := []byte("tx")
 
@@ -274,7 +274,7 @@ func TestCLOBTxSelectorCLOBRatioFull(t *testing.T) {
 func TestCLOBTxSelectorClearAndReuse(t *testing.T) {
 	const maxTxBytes = 1_000_000_000
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	txBz := []byte("tx")
 
@@ -302,7 +302,7 @@ func TestCLOBTxSelectorCLOBBytesLimit(t *testing.T) {
 	txSize := uint64(cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{txBz}))
 	maxTxBytes := txSize * 2 // clobBytesLimit = 0.3 * 2*txSize ≈ 0.6*txSize < txSize
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	clobTx := makeSelectorTx(true)
 	regularTx := makeSelectorTx(false)
@@ -324,7 +324,7 @@ func TestCLOBTxSelectorBytesRollover(t *testing.T) {
 	txSize := uint64(cmttypes.ComputeProtoSizeForTxs([]cmttypes.Tx{txBz}))
 	maxTxBytes := txSize * 3 // room for 3 txs total
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	regularTx := makeSelectorTx(false)
 
@@ -348,7 +348,7 @@ func TestCLOBTxSelectorMixedBytesAndGas(t *testing.T) {
 	// clobBytesLimit = 0.3 * 2*txSize < txSize → byte-limited
 	maxTxBytes := txSize * 2
 
-	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	sel := newTestCLOBTxSelector(0.3, testIsCLOBTx)
 	ctx := context.Background()
 	clobTx := makeSelectorTx(true)
 

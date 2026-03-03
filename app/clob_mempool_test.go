@@ -9,8 +9,10 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/mempool"
-	exchangetypes "github.com/crypto-org-chain/cronos/x/exchange/types"
 )
+
+// testSequencerAddr is the canonical sequencer address used across CLOB tests.
+var testSequencerAddr = sdk.AccAddress([]byte("clob-sequencer______"))
 
 // testTx is a minimal sdk.Tx implementation for testing CLOBMempool routing.
 type testTx struct {
@@ -32,6 +34,15 @@ func (testSignerExtractor) GetSigners(tx sdk.Tx) ([]mempool.SignerData, error) {
 	}, nil
 }
 
+// testIsCLOBTx classifies a testTx as CLOB when its signer matches testSequencerAddr.
+func testIsCLOBTx(tx sdk.Tx) bool {
+	t, ok := tx.(*testTx)
+	if !ok {
+		return false
+	}
+	return t.signer.Equals(testSequencerAddr)
+}
+
 // newTestSDKCtx returns an sdk.Context suitable for mempool operations.
 // The PriorityNonceMempool's default TxPriority requires an sdk.Context.
 func newTestSDKCtx() sdk.Context {
@@ -39,19 +50,19 @@ func newTestSDKCtx() sdk.Context {
 }
 
 func newTestCLOBMempool() *CLOBMempool {
-	return NewCLOBMempool(100, testSignerExtractor{}, nil)
+	return NewCLOBMempool(100, testSignerExtractor{}, nil, testIsCLOBTx)
 }
 
-// newCLOBTx creates a testTx containing a MsgSettleBatch (CLOB tx).
+// newCLOBTx creates a testTx signed by testSequencerAddr (CLOB tx).
 func newCLOBTx(signer sdk.AccAddress, nonce uint64) *testTx {
 	return &testTx{
-		msgs:   []sdk.Msg{&exchangetypes.MsgSettleBatch{}},
+		msgs:   []sdk.Msg{},
 		signer: signer,
 		nonce:  nonce,
 	}
 }
 
-// newRegularTx creates a testTx with no CLOB messages.
+// newRegularTx creates a testTx with a non-sequencer signer.
 func newRegularTx(signer sdk.AccAddress, nonce uint64) *testTx {
 	return &testTx{
 		msgs:   []sdk.Msg{},
@@ -63,10 +74,10 @@ func newRegularTx(signer sdk.AccAddress, nonce uint64) *testTx {
 func TestCLOBMempoolRouting(t *testing.T) {
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
-	signer := sdk.AccAddress([]byte("signer__________"))
+	otherSigner := sdk.AccAddress([]byte("other-signer________"))
 
-	clobTx := newCLOBTx(signer, 1)
-	regularTx := newRegularTx(signer, 2)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
+	regularTx := newRegularTx(otherSigner, 2)
 
 	require.NoError(t, pool.Insert(ctx, clobTx))
 	require.NoError(t, pool.Insert(ctx, regularTx))
@@ -79,10 +90,10 @@ func TestCLOBMempoolRouting(t *testing.T) {
 func TestCLOBMempoolInsertWithGasWanted(t *testing.T) {
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
-	signer := sdk.AccAddress([]byte("signer__________"))
+	otherSigner := sdk.AccAddress([]byte("other-signer________"))
 
-	clobTx := newCLOBTx(signer, 1)
-	regularTx := newRegularTx(signer, 2)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
+	regularTx := newRegularTx(otherSigner, 2)
 
 	require.NoError(t, pool.InsertWithGasWanted(ctx, clobTx, 1000))
 	require.NoError(t, pool.InsertWithGasWanted(ctx, regularTx, 2000))
@@ -94,10 +105,10 @@ func TestCLOBMempoolInsertWithGasWanted(t *testing.T) {
 func TestCLOBMempoolRemove(t *testing.T) {
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
-	signer := sdk.AccAddress([]byte("signer__________"))
+	otherSigner := sdk.AccAddress([]byte("other-signer________"))
 
-	clobTx := newCLOBTx(signer, 1)
-	regularTx := newRegularTx(signer, 2)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
+	regularTx := newRegularTx(otherSigner, 2)
 
 	require.NoError(t, pool.Insert(ctx, clobTx))
 	require.NoError(t, pool.Insert(ctx, regularTx))
@@ -116,10 +127,10 @@ func TestCLOBMempoolRemove(t *testing.T) {
 func TestCLOBMempoolSelectByOrder(t *testing.T) {
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
-	signer := sdk.AccAddress([]byte("signer__________"))
+	otherSigner := sdk.AccAddress([]byte("other-signer________"))
 
-	clobTx := newCLOBTx(signer, 1)
-	regularTx := newRegularTx(signer, 2)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
+	regularTx := newRegularTx(otherSigner, 2)
 
 	// Insert regular first, then CLOB — CLOB should still come out first.
 	require.NoError(t, pool.Insert(ctx, regularTx))
@@ -127,7 +138,7 @@ func TestCLOBMempoolSelectByOrder(t *testing.T) {
 
 	var order []bool // true = CLOB, false = regular
 	pool.SelectBy(ctx, nil, func(tx mempool.Tx) bool {
-		order = append(order, isCLOBTx(tx.Tx))
+		order = append(order, testIsCLOBTx(tx.Tx))
 		return true
 	})
 
@@ -139,10 +150,10 @@ func TestCLOBMempoolSelectByOrder(t *testing.T) {
 func TestCLOBMempoolSelectByHalt(t *testing.T) {
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
-	signer := sdk.AccAddress([]byte("signer__________"))
+	otherSigner := sdk.AccAddress([]byte("other-signer________"))
 
-	clobTx := newCLOBTx(signer, 1)
-	regularTx := newRegularTx(signer, 2)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
+	regularTx := newRegularTx(otherSigner, 2)
 
 	require.NoError(t, pool.Insert(ctx, clobTx))
 	require.NoError(t, pool.Insert(ctx, regularTx))
@@ -161,10 +172,10 @@ func TestCLOBMempoolSelectByHalt(t *testing.T) {
 func TestCLOBMempoolSelectIterator(t *testing.T) {
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
-	signer := sdk.AccAddress([]byte("signer__________"))
+	otherSigner := sdk.AccAddress([]byte("other-signer________"))
 
-	clobTx := newCLOBTx(signer, 1)
-	regularTx := newRegularTx(signer, 2)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
+	regularTx := newRegularTx(otherSigner, 2)
 
 	require.NoError(t, pool.Insert(ctx, clobTx))
 	require.NoError(t, pool.Insert(ctx, regularTx))
@@ -175,8 +186,8 @@ func TestCLOBMempoolSelectIterator(t *testing.T) {
 	}
 
 	require.Len(t, txs, 2)
-	require.True(t, isCLOBTx(txs[0]), "first iterated tx should be CLOB")
-	require.False(t, isCLOBTx(txs[1]), "second iterated tx should be regular")
+	require.True(t, testIsCLOBTx(txs[0]), "first iterated tx should be CLOB")
+	require.False(t, testIsCLOBTx(txs[1]), "second iterated tx should be regular")
 }
 
 func TestCLOBMempoolRemoveNotFound(t *testing.T) {
@@ -190,19 +201,22 @@ func TestCLOBMempoolRemoveNotFound(t *testing.T) {
 
 func TestCLOBMempoolMaxTxCapacity(t *testing.T) {
 	// MaxTx=1 means each sub-pool accepts only one transaction.
-	pool := NewCLOBMempool(1, testSignerExtractor{}, nil)
+	pool := NewCLOBMempool(1, testSignerExtractor{}, nil, testIsCLOBTx)
 	ctx := newTestSDKCtx()
-	signer1 := sdk.AccAddress([]byte("signer-max-1________"))
 	signer2 := sdk.AccAddress([]byte("signer-max-2________"))
 
-	require.NoError(t, pool.Insert(ctx, newCLOBTx(signer1, 1)))
+	require.NoError(t, pool.Insert(ctx, newCLOBTx(testSequencerAddr, 1)))
 	// Second CLOB tx from a different sender exceeds MaxTx=1 for clobPool.
-	err := pool.Insert(ctx, newCLOBTx(signer2, 1))
+	// Use testSequencerAddr so it's classified as CLOB — but pool is at capacity.
+	// Note: we need a tx that IS clob, so we must use the sequencer addr.
+	// To get a second distinct signer we create a second mempool-level entry, but
+	// MaxTx=1 applies to total entries, so a second insert from any CLOB signer fails.
+	err := pool.Insert(ctx, newCLOBTx(testSequencerAddr, 2))
 	require.ErrorIs(t, err, mempool.ErrMempoolTxMaxCapacity)
 
-	require.NoError(t, pool.Insert(ctx, newRegularTx(signer1, 1)))
+	require.NoError(t, pool.Insert(ctx, newRegularTx(signer2, 1)))
 	// Second regular tx from a different sender exceeds MaxTx=1 for regularPool.
-	err = pool.Insert(ctx, newRegularTx(signer2, 1))
+	err = pool.Insert(ctx, newRegularTx(sdk.AccAddress([]byte("signer-max-3________")), 1))
 	require.ErrorIs(t, err, mempool.ErrMempoolTxMaxCapacity)
 }
 
@@ -221,24 +235,19 @@ func TestCLOBMempoolEmptyCLOBPool(t *testing.T) {
 	})
 
 	require.Len(t, visited, 1)
-	require.False(t, isCLOBTx(visited[0]), "only regular tx should be visited")
+	require.False(t, testIsCLOBTx(visited[0]), "only regular tx should be visited")
 }
 
-func TestCLOBMempoolMultipleCLOBSigners(t *testing.T) {
-	// Multiple CLOB txs from different signers must all land in clobPool.
+func TestCLOBMempoolMultipleCLOBTxs(t *testing.T) {
+	// Multiple CLOB txs (different nonces) from the sequencer must all land in clobPool.
 	pool := newTestCLOBMempool()
 	ctx := newTestSDKCtx()
 
-	signers := []sdk.AccAddress{
-		sdk.AccAddress([]byte("clob-multi-sig-1____")),
-		sdk.AccAddress([]byte("clob-multi-sig-2____")),
-		sdk.AccAddress([]byte("clob-multi-sig-3____")),
-	}
-	for _, s := range signers {
-		require.NoError(t, pool.Insert(ctx, newCLOBTx(s, 1)))
+	for i := uint64(1); i <= 3; i++ {
+		require.NoError(t, pool.Insert(ctx, newCLOBTx(testSequencerAddr, i)))
 	}
 
-	require.Equal(t, len(signers), pool.clobPool.CountTx())
+	require.Equal(t, 3, pool.clobPool.CountTx())
 	require.Equal(t, 0, pool.regularPool.CountTx())
-	require.Equal(t, len(signers), pool.CountTx())
+	require.Equal(t, 3, pool.CountTx())
 }

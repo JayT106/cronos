@@ -22,20 +22,30 @@ maintaining or extending this code.
 ### CLOB Transaction Detection
 
 ```go
-func isCLOBTx(tx sdk.Tx) bool {
-    for _, msg := range tx.GetMsgs() {
-        if _, ok := msg.(*exchangetypes.MsgSettleBatch); ok {
-            return true
-        }
+func NewCLOBTxDetector(sequencerAddr sdk.AccAddress) func(sdk.Tx) bool {
+    if len(sequencerAddr) == 0 {
+        return func(sdk.Tx) bool { return false }
     }
-    return false
+    return func(tx sdk.Tx) bool {
+        for _, msg := range tx.GetMsgs() {
+            ethMsg, ok := msg.(*evmtypes.MsgEthereumTx)
+            if ok && bytes.Equal(ethMsg.GetFrom(), sequencerAddr) {
+                return true
+            }
+        }
+        return false
+    }
 }
 ```
 
-A transaction is classified as CLOB if it contains at least one
-`MsgSettleBatch`. This check runs at insertion time (`Insert` /
-`InsertWithGasWanted`) and again in the `CLOBTxSelector` during proposal
-building.
+A transaction is classified as CLOB if it contains a `MsgEthereumTx` whose
+sender (via `GetFrom()`) matches the configured sequencer address. The detector
+is a closure created at startup via `NewCLOBTxDetector(sequencerAddr)` and
+passed to both `CLOBMempool` and `CLOBTxSelector`. If no sequencer address is
+configured, the detector always returns false (all txs go to regularPool).
+
+This check runs at insertion time (`Insert` / `InsertWithGasWanted`) and again
+in the `CLOBTxSelector` during proposal building.
 
 ### Dual-Pool Structure
 
@@ -43,6 +53,7 @@ building.
 type CLOBMempool struct {
     clobPool    *mempool.PriorityNonceMempool[int64]
     regularPool *mempool.PriorityNonceMempool[int64]
+    isCLOBTx    func(sdk.Tx) bool
 }
 ```
 
@@ -54,7 +65,7 @@ locks, sender indices, and priority indices.
 
 | Method | Routing Logic |
 |--------|--------------|
-| `Insert` / `InsertWithGasWanted` | `isCLOBTx(tx)` → `clobPool`, else → `regularPool` |
+| `Insert` / `InsertWithGasWanted` | `cm.isCLOBTx(tx)` → `clobPool`, else → `regularPool` |
 | `Remove` | Try `clobPool` first; on `ErrTxNotFound`, fall through to `regularPool` |
 | `CountTx` | Sum of both pools |
 | `Select` | `chainedIterator(clobPool.Select(), regularPool.Select())` |
@@ -136,13 +147,20 @@ clobBlockRatio := cast.ToFloat64(appOpts.Get(FlagCLOBBlockRatio))
 if clobBlockRatio > 1.0 {
     clobBlockRatio = 1.0  // clamp to prevent uint64 underflow
 }
+clobSequencerAddress := cast.ToString(appOpts.Get(FlagCLOBSequencerAddress))
+var sequencerAddr sdk.AccAddress
+if clobSequencerAddress != "" {
+    sequencerAddr, err = sdk.AccAddressFromBech32(clobSequencerAddress)
+    // panics on invalid address
+}
+isCLOBFn := NewCLOBTxDetector(sequencerAddr)
 ```
 
 ### Three-Way Mempool Init
 
 ```go
-if mempoolMaxTxs >= 0 && feeBump >= 0 && clobBlockRatio > 0 {
-    mpool = NewCLOBMempool(...)
+if mempoolMaxTxs >= 0 && feeBump >= 0 && clobBlockRatio > 0 && len(sequencerAddr) > 0 {
+    mpool = NewCLOBMempool(..., isCLOBFn)
 } else if mempoolMaxTxs >= 0 && feeBump >= 0 {
     mpool = mempool.NewPriorityMempool(...)  // existing path
 } else {
@@ -169,11 +187,16 @@ even if config parameters create unexpected combinations.
 
 ```toml
 [cronos]
-# Fraction of block resources (gas and bytes) reserved for CLOB (MsgSettleBatch) transactions [0.0 to 1.0].
+# Fraction of block resources (gas and bytes) reserved for CLOB transactions [0.0 to 1.0].
 # CLOB transactions are placed first in every block.
 # Unused CLOB quota rolls over to regular EVM transactions.
 # Set to 0.0 to disable (default).
 clob-block-ratio = 0.0
+
+# Bech32 address of the off-chain CLOB sequencer.
+# MsgEthereumTx transactions from this sender are classified as CLOB.
+# Leave empty to disable CLOB detection (default).
+clob-sequencer-address = ""
 ```
 
 ### Recommended Values
@@ -240,27 +263,35 @@ Shared test infrastructure in `app/clob_mempool_test.go`:
 
 - `testTx` — minimal `sdk.Tx` with `GetMsgs()` and `GetMsgsV2()`
 - `testSignerExtractor` — reads signer/nonce directly from `*testTx`
+- `testSequencerAddr` — canonical sequencer address for CLOB test routing
+- `testIsCLOBTx()` — classifies `testTx` as CLOB when signer matches `testSequencerAddr`
 - `newTestSDKCtx()` — creates `sdk.Context` with nil multistore (safe for priority extraction)
-- `newCLOBTx()` / `newRegularTx()` — create test txs with/without `MsgSettleBatch`
+- `newCLOBTx()` / `newRegularTx()` — create test txs with sequencer/non-sequencer signers
 - `mockProposalVerifier` — bidirectional tx-to-bytes map implementing `baseapp.ProposalTxVerifier`
 
 ## Extending the Feature
 
-### Adding New CLOB Message Types
+### Governance-Based Sequencer Address
 
-Update `isCLOBTx` in `app/clob_mempool.go`:
+The current design reads the sequencer address from `app.toml` at startup.
+To support on-chain governance updates, replace `NewCLOBTxDetector` with a
+closure that reads from the governance module's keeper at detection time:
 
 ```go
-func isCLOBTx(tx sdk.Tx) bool {
-    for _, msg := range tx.GetMsgs() {
-        switch msg.(type) {
-        case *exchangetypes.MsgSettleBatch:
-            return true
-        case *exchangetypes.MsgNewOrderType:  // hypothetical
-            return true
+func NewGovCLOBTxDetector(keeper ExchangeKeeper) func(sdk.Tx) bool {
+    return func(tx sdk.Tx) bool {
+        sequencerAddr := keeper.GetSequencerAddress()
+        if len(sequencerAddr) == 0 {
+            return false
         }
+        for _, msg := range tx.GetMsgs() {
+            ethMsg, ok := msg.(*evmtypes.MsgEthereumTx)
+            if ok && bytes.Equal(ethMsg.GetFrom(), sequencerAddr) {
+                return true
+            }
+        }
+        return false
     }
-    return false
 }
 ```
 

@@ -1,61 +1,72 @@
 package app
 
 import (
+	"bytes"
 	"context"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/mempool"
-	exchangetypes "github.com/crypto-org-chain/cronos/x/exchange/types"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 )
 
-// isCLOBTx returns true if the transaction contains at least one MsgSettleBatch message.
-func isCLOBTx(tx sdk.Tx) bool {
-	for _, msg := range tx.GetMsgs() {
-		if _, ok := msg.(*exchangetypes.MsgSettleBatch); ok {
-			return true
-		}
+// NewCLOBTxDetector returns a function that classifies a transaction as CLOB
+// if it is a MsgEthereumTx sent by the given sequencer address.
+// If sequencerAddr is empty, the returned function always returns false.
+func NewCLOBTxDetector(sequencerAddr sdk.AccAddress) func(sdk.Tx) bool {
+	if len(sequencerAddr) == 0 {
+		return func(sdk.Tx) bool { return false }
 	}
-	return false
+	return func(tx sdk.Tx) bool {
+		for _, msg := range tx.GetMsgs() {
+			ethMsg, ok := msg.(*evmtypes.MsgEthereumTx)
+			if ok && bytes.Equal(ethMsg.GetFrom(), sequencerAddr) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
-// CLOBMempool is a mempool that separates CLOB (MsgSettleBatch) transactions
-// from regular transactions. CLOB txs are iterated first in SelectBy/Select,
-// giving them priority placement at the front of every block proposal.
+// CLOBMempool is a mempool that separates CLOB transactions from regular
+// transactions. CLOB txs are iterated first in SelectBy/Select, giving them
+// priority placement at the front of every block proposal.
 type CLOBMempool struct {
 	clobPool    *mempool.PriorityNonceMempool[int64]
 	regularPool *mempool.PriorityNonceMempool[int64]
+	isCLOBTx    func(sdk.Tx) bool
 }
 
 var _ mempool.ExtMempool = (*CLOBMempool)(nil)
 
 // NewCLOBMempool creates a CLOBMempool backed by two PriorityNonceMempools
 // sharing the same SignerExtractionAdapter and TxReplacement policy.
-func NewCLOBMempool(maxTx int, signerExtractor mempool.SignerExtractionAdapter, txReplacement func(int64, int64, sdk.Tx, sdk.Tx) bool) *CLOBMempool {
+func NewCLOBMempool(maxTx int, signerExtractor mempool.SignerExtractionAdapter, txReplacement func(int64, int64, sdk.Tx, sdk.Tx) bool, isCLOBTx func(sdk.Tx) bool) *CLOBMempool {
 	cfg := mempool.PriorityNonceMempoolConfig[int64]{
-		TxPriority:     mempool.NewDefaultTxPriority(),
+		TxPriority:      mempool.NewDefaultTxPriority(),
 		SignerExtractor: signerExtractor,
-		MaxTx:          maxTx,
-		TxReplacement:  txReplacement,
+		MaxTx:           maxTx,
+		TxReplacement:   txReplacement,
 	}
 	return &CLOBMempool{
 		clobPool:    mempool.NewPriorityMempool(cfg),
 		regularPool: mempool.NewPriorityMempool(cfg),
+		isCLOBTx:    isCLOBTx,
 	}
 }
 
-// Insert routes the transaction to clobPool if it contains MsgSettleBatch,
-// otherwise to regularPool.
+// Insert routes the transaction to clobPool if the detector identifies it as
+// CLOB, otherwise to regularPool.
 func (cm *CLOBMempool) Insert(ctx context.Context, tx sdk.Tx) error {
-	if isCLOBTx(tx) {
+	if cm.isCLOBTx(tx) {
 		return cm.clobPool.Insert(ctx, tx)
 	}
 	return cm.regularPool.Insert(ctx, tx)
 }
 
-// InsertWithGasWanted routes the transaction to clobPool if it contains MsgSettleBatch,
-// otherwise to regularPool.
+// InsertWithGasWanted routes the transaction to clobPool if the detector
+// identifies it as CLOB, otherwise to regularPool.
 func (cm *CLOBMempool) InsertWithGasWanted(ctx context.Context, tx sdk.Tx, gasWanted uint64) error {
-	if isCLOBTx(tx) {
+	if cm.isCLOBTx(tx) {
 		return cm.clobPool.InsertWithGasWanted(ctx, tx, gasWanted)
 	}
 	return cm.regularPool.InsertWithGasWanted(ctx, tx, gasWanted)

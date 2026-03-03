@@ -15,16 +15,21 @@ type CronosConfig struct {
 	// Set to true to disable optimistic execution.
 	DisableOptimisticExecution bool `mapstructure:"disable-optimistic-execution"`
 	// CLOBBlockRatio is the fraction of block resources (gas and bytes) reserved for
-	// CLOB (MsgSettleBatch) transactions. CLOB txs go first in every block, and
+	// CLOB transactions. CLOB txs go first in every block, and
 	// unused quota rolls over to regular txs.
 	// Range: [0.0, 1.0]. Set to 0.0 to disable.
 	CLOBBlockRatio float64 `mapstructure:"clob-block-ratio"`
+	// CLOBSequencerAddress is the bech32 address of the off-chain sequencer whose
+	// MsgEthereumTx transactions are classified as CLOB. Leave empty to disable
+	// CLOB detection (all txs go to the regular pool).
+	CLOBSequencerAddress string `mapstructure:"clob-sequencer-address"`
 }
 
 func DefaultCronosConfig() CronosConfig {
 	return CronosConfig{
 		DisableTxReplacement:       false,
 		DisableOptimisticExecution: false,
-		CLOBBlockRatio:                 0.0,
+		CLOBBlockRatio:             0.0,
+		CLOBSequencerAddress:       "",
 	}
 }

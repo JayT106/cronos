@@ -76,7 +76,7 @@ func (ts *ExtTxSelector) SelectTxForProposalFast(ctx context.Context, txs [][]by
 }
 
 // CLOBTxSelector is a TxSelector that reserves a configurable fraction of block
-// resources (both gas and bytes) for CLOB (MsgSettleBatch) transactions. CLOB txs
+// resources (both gas and bytes) for CLOB transactions. CLOB txs
 // are expected to appear first in the SelectBy iteration order (via CLOBMempool).
 // Unused CLOB quota rolls over to regular transactions so no block space is wasted.
 type CLOBTxSelector struct {

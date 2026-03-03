@@ -182,6 +182,7 @@ const (
 	FlagDisableTxReplacement       = "cronos.disable-tx-replacement"
 	FlagDisableOptimisticExecution = "cronos.disable-optimistic-execution"
 	FlagCLOBBlockRatio             = "cronos.clob-block-ratio"
+	FlagCLOBSequencerAddress       = "cronos.clob-sequencer-address"
 )
 
 var Forks = []Fork{}
@@ -391,14 +392,24 @@ func New(
 	if clobBlockRatio > 1.0 {
 		clobBlockRatio = 1.0
 	}
-	if mempoolMaxTxs >= 0 && feeBump >= 0 && clobBlockRatio > 0 {
-		logger.Info("NewCLOBMempool is enabled", "feebump", feeBump, "clobBlockRatio", clobBlockRatio)
+	clobSequencerAddress := cast.ToString(appOpts.Get(FlagCLOBSequencerAddress))
+	var sequencerAddr sdk.AccAddress
+	if clobSequencerAddress != "" {
+		var err error
+		sequencerAddr, err = sdk.AccAddressFromBech32(clobSequencerAddress)
+		if err != nil {
+			panic(fmt.Sprintf("invalid clob-sequencer-address %q: %v", clobSequencerAddress, err))
+		}
+	}
+	isCLOBFn := NewCLOBTxDetector(sequencerAddr)
+	if mempoolMaxTxs >= 0 && feeBump >= 0 && clobBlockRatio > 0 && len(sequencerAddr) > 0 {
+		logger.Info("NewCLOBMempool is enabled", "feebump", feeBump, "clobBlockRatio", clobBlockRatio, "sequencerAddress", clobSequencerAddress)
 		signerExtractor := evmapp.NewEthSignerExtractionAdapter(mempool.NewDefaultSignerExtractionAdapter())
 		txReplacement := func(op, np int64, oTx, nTx sdk.Tx) bool {
 			threshold := 100 + feeBump
 			return np >= op*threshold/100
 		}
-		mpool = NewCLOBMempool(mempoolMaxTxs, signerExtractor, txReplacement)
+		mpool = NewCLOBMempool(mempoolMaxTxs, signerExtractor, txReplacement, isCLOBFn)
 	} else if mempoolMaxTxs >= 0 && feeBump >= 0 {
 		// NOTE we use custom transaction decoder that supports the sdk.Tx interface instead of sdk.StdTx
 		// Setup Mempool and Proposal Handlers
@@ -426,7 +437,7 @@ func New(
 		if _, ok := mpool.(*CLOBMempool); ok {
 			defaultProposalHandler.SetTxSelector(NewCLOBTxSelector(
 				clobBlockRatio,
-				isCLOBTx,
+				isCLOBFn,
 				blockProposalHandler.ValidateTransaction,
 				txDecoder,
 			))

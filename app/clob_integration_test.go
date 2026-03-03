@@ -71,11 +71,11 @@ func newIntegrationCtx(maxBlockGas int64) sdk.Context {
 // buildCLOBProposalHandler constructs a CLOBMempool + CLOBTxSelector +
 // PrepareProposalHandler wired together for integration testing.
 func buildCLOBProposalHandler(clobBlockRatio float64, verifier baseapp.ProposalTxVerifier) (*CLOBMempool, sdk.PrepareProposalHandler) {
-	mpool := NewCLOBMempool(100, testSignerExtractor{}, nil)
+	mpool := NewCLOBMempool(100, testSignerExtractor{}, nil, testIsCLOBTx)
 
 	noopDecoder := func([]byte) (sdk.Tx, error) { return nil, nil }
 	noopValidate := func(sdk.Tx, []byte) error { return nil }
-	selector := NewCLOBTxSelector(clobBlockRatio, isCLOBTx, noopValidate, noopDecoder)
+	selector := NewCLOBTxSelector(clobBlockRatio, testIsCLOBTx, noopValidate, noopDecoder)
 
 	handler := baseapp.NewDefaultProposalHandler(mpool, verifier)
 	handler.SetTxSelector(selector)
@@ -96,9 +96,8 @@ func TestCLOBIntegration_OrderCLOBFirst(t *testing.T) {
 	mpool, prepareProposal := buildCLOBProposalHandler(0.3, verifier)
 
 	regularSigner := sdk.AccAddress([]byte("integ-reg-signer____"))
-	clobSigner := sdk.AccAddress([]byte("integ-clob-signer___"))
 	regularTx := newRegularTx(regularSigner, 1)
-	clobTx := newCLOBTx(clobSigner, 1)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
 
 	verifier.registerTx(regularTx, []byte("integ-regular-tx"))
 	verifier.registerTx(clobTx, []byte("integ-clob-tx"))
@@ -115,11 +114,11 @@ func TestCLOBIntegration_OrderCLOBFirst(t *testing.T) {
 
 	first, err := verifier.TxDecode(resp.Txs[0])
 	require.NoError(t, err)
-	require.True(t, isCLOBTx(first), "first proposal tx must be CLOB")
+	require.True(t, testIsCLOBTx(first), "first proposal tx must be CLOB")
 
 	second, err := verifier.TxDecode(resp.Txs[1])
 	require.NoError(t, err)
-	require.False(t, isCLOBTx(second), "second proposal tx must be regular")
+	require.False(t, testIsCLOBTx(second), "second proposal tx must be regular")
 }
 
 // TestCLOBIntegration_CLOBGasExceedsQuota verifies that a CLOB tx whose gas
@@ -133,9 +132,8 @@ func TestCLOBIntegration_CLOBGasExceedsQuota(t *testing.T) {
 	verifier := newMockProposalVerifier()
 	mpool, prepareProposal := buildCLOBProposalHandler(0.3, verifier)
 
-	clobSigner := sdk.AccAddress([]byte("integ-quota-clob-sig"))
 	regularSigner := sdk.AccAddress([]byte("integ-quota-reg-sig_"))
-	clobTx := newCLOBTx(clobSigner, 1)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
 	regularTx := newRegularTx(regularSigner, 1)
 
 	verifier.registerTx(clobTx, []byte("quota-clob-tx"))
@@ -152,7 +150,7 @@ func TestCLOBIntegration_CLOBGasExceedsQuota(t *testing.T) {
 
 	only, err := verifier.TxDecode(resp.Txs[0])
 	require.NoError(t, err)
-	require.False(t, isCLOBTx(only), "only selected tx should be regular")
+	require.False(t, testIsCLOBTx(only), "only selected tx should be regular")
 }
 
 // TestCLOBIntegration_GasRollover verifies that when no CLOB txs are in the
@@ -181,7 +179,7 @@ func TestCLOBIntegration_GasRollover(t *testing.T) {
 
 	only, err := verifier.TxDecode(resp.Txs[0])
 	require.NoError(t, err)
-	require.False(t, isCLOBTx(only))
+	require.False(t, testIsCLOBTx(only))
 }
 
 // TestCLOBIntegration_PartialCLOBQuota verifies the mixed scenario: a CLOB tx
@@ -195,9 +193,8 @@ func TestCLOBIntegration_PartialCLOBQuota(t *testing.T) {
 	verifier := newMockProposalVerifier()
 	mpool, prepareProposal := buildCLOBProposalHandler(0.3, verifier)
 
-	clobSigner := sdk.AccAddress([]byte("integ-partial-clob__"))
 	regularSigner := sdk.AccAddress([]byte("integ-partial-reg___"))
-	clobTx := newCLOBTx(clobSigner, 1)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
 	regularTx := newRegularTx(regularSigner, 1)
 
 	verifier.registerTx(clobTx, []byte("partial-clob-tx"))
@@ -214,11 +211,11 @@ func TestCLOBIntegration_PartialCLOBQuota(t *testing.T) {
 
 	first, err := verifier.TxDecode(resp.Txs[0])
 	require.NoError(t, err)
-	require.True(t, isCLOBTx(first), "CLOB tx must appear first")
+	require.True(t, testIsCLOBTx(first), "CLOB tx must appear first")
 
 	second, err := verifier.TxDecode(resp.Txs[1])
 	require.NoError(t, err)
-	require.False(t, isCLOBTx(second), "regular tx must appear second")
+	require.False(t, testIsCLOBTx(second), "regular tx must appear second")
 }
 
 // TestCLOBIntegration_UnlimitedGas verifies that when maxBlockGas=0 (unlimited)
@@ -228,9 +225,8 @@ func TestCLOBIntegration_UnlimitedGas(t *testing.T) {
 	verifier := newMockProposalVerifier()
 	mpool, prepareProposal := buildCLOBProposalHandler(0.3, verifier)
 
-	clobSigner := sdk.AccAddress([]byte("integ-unlim-clob-sig"))
 	regularSigner := sdk.AccAddress([]byte("integ-unlim-reg-sig_"))
-	clobTx := newCLOBTx(clobSigner, 1)
+	clobTx := newCLOBTx(testSequencerAddr, 1)
 	regularTx := newRegularTx(regularSigner, 1)
 
 	verifier.registerTx(clobTx, []byte("unlim-clob-tx"))
