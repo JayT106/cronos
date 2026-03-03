@@ -73,3 +73,222 @@ func TestSelectTxForProposalFast(t *testing.T) {
 		require.Equal(t, expected, result)
 	})
 }
+
+// --- CLOBTxSelector tests ---
+
+func newTestCLOBTxSelector(ratio float64, isCLOBFn func(sdk.Tx) bool) *CLOBTxSelector {
+	validateFn := func(sdk.Tx, []byte) error { return nil }
+	decoderFn := func([]byte) (sdk.Tx, error) { return nil, nil }
+	return NewCLOBTxSelector(ratio, isCLOBFn, validateFn, decoderFn)
+}
+
+// makeSelectorTx returns a test tx identified by the isClob flag.
+// It reuses testTx / newCLOBTx / newRegularTx defined in clob_mempool_test.go.
+func makeSelectorTx(isClob bool) sdk.Tx {
+	signer := sdk.AccAddress([]byte("proposaltestsigner__"))
+	if isClob {
+		return newCLOBTx(signer, 1)
+	}
+	return newRegularTx(signer, 1)
+}
+
+func TestCLOBTxSelectorCLOBGasLimit(t *testing.T) {
+	const (
+		maxBlockGas = 10_000_000
+		maxTxBytes  = 1_000_000_000 // high enough not to be the limit
+	)
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx) // 3M CLOB gas limit
+	ctx := context.Background()
+	txBz := []byte("tx")
+	clobTx := makeSelectorTx(true)
+
+	// First CLOB tx: 2M gas → within 3M limit, accepted.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, clobTx, txBz, 2_000_000)
+	require.False(t, stop)
+	require.Len(t, sel.SelectedTxs(ctx), 1)
+
+	// Second CLOB tx: another 2M gas → total 4M > 3M limit, skipped but not halted.
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, clobTx, txBz, 2_000_000)
+	require.False(t, stop, "should skip (not halt) when CLOB gas limit exceeded")
+	require.Len(t, sel.SelectedTxs(ctx), 1, "second CLOB tx should not be selected")
+}
+
+func TestCLOBTxSelectorRollover(t *testing.T) {
+	const (
+		maxBlockGas = 10_000_000
+		maxTxBytes  = 1_000_000_000
+	)
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	txBz := []byte("tx")
+	regularTx := makeSelectorTx(false)
+
+	// No CLOB txs used; effective regular limit = 10M - 0 = 10M (full rollover).
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, regularTx, txBz, 9_000_000)
+	require.False(t, stop)
+	require.Len(t, sel.SelectedTxs(ctx), 1)
+
+	// Second regular tx: 1M gas → total 10M, exactly at limit.
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, regularTx, txBz, 1_000_000)
+	require.True(t, stop, "should halt when block gas is exactly exhausted")
+	require.Len(t, sel.SelectedTxs(ctx), 2, "second regular tx should be selected")
+}
+
+func TestCLOBTxSelectorMixed(t *testing.T) {
+	const (
+		maxBlockGas = 10_000_000
+		maxTxBytes  = 1_000_000_000
+	)
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx) // 3M CLOB, 7M available for regular (with rollover)
+	ctx := context.Background()
+	txBz := []byte("tx")
+	clobTx := makeSelectorTx(true)
+	regularTx := makeSelectorTx(false)
+
+	// Use 2M CLOB gas.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, clobTx, txBz, 2_000_000)
+	require.False(t, stop)
+
+	// Regular tx: effectiveRegularLimit = 10M - 2M = 8M.
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, regularTx, txBz, 8_000_000)
+	require.True(t, stop, "should halt: total gas = 10M")
+	require.Len(t, sel.SelectedTxs(ctx), 2)
+}
+
+func TestCLOBTxSelectorRegularGasExceeded(t *testing.T) {
+	const (
+		maxBlockGas = 10_000_000
+		maxTxBytes  = 1_000_000_000
+	)
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	txBz := []byte("tx")
+	clobTx := makeSelectorTx(true)
+	regularTx := makeSelectorTx(false)
+
+	// Use 2M CLOB gas → effectiveRegularLimit = 8M.
+	sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, clobTx, txBz, 2_000_000)
+
+	// Regular tx needing 9M > 8M limit → should halt.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, regularTx, txBz, 9_000_000)
+	require.True(t, stop, "should halt when regular tx exceeds effective limit")
+	require.Len(t, sel.SelectedTxs(ctx), 1, "oversized regular tx should not be selected")
+}
+
+func TestCLOBTxSelectorUnlimitedGas(t *testing.T) {
+	const (
+		maxBlockGas = 0 // unlimited
+		maxTxBytes  = 1_000_000_000
+	)
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	txBz := []byte("tx")
+
+	// When maxBlockGas=0, gas checks are skipped entirely.
+	for i := 0; i < 5; i++ {
+		stop := sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, makeSelectorTx(i%2 == 0), txBz, 999_999_999)
+		require.False(t, stop)
+	}
+	require.Len(t, sel.SelectedTxs(ctx), 5)
+}
+
+func TestCLOBTxSelectorValidationError(t *testing.T) {
+	validateFn := func(_ sdk.Tx, txBz []byte) error {
+		if string(txBz) == "invalid" {
+			return errors.New("blocked")
+		}
+		return nil
+	}
+	decoderFn := func([]byte) (sdk.Tx, error) { return nil, nil }
+	sel := NewCLOBTxSelector(0.3, isCLOBTx, validateFn, decoderFn)
+	ctx := context.Background()
+
+	clobTx := makeSelectorTx(true)
+	stop := sel.SelectTxForProposal(ctx, 1_000_000_000, 10_000_000, clobTx, []byte("invalid"), 1_000)
+	require.False(t, stop, "invalid tx should be skipped (not halt)")
+	require.Empty(t, sel.SelectedTxs(ctx))
+}
+
+func TestCLOBTxSelectorClear(t *testing.T) {
+	const (
+		maxBlockGas = 10_000_000
+		maxTxBytes  = 1_000_000_000
+	)
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	txBz := []byte("tx")
+
+	sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, makeSelectorTx(true), txBz, 1_000_000)
+	require.Len(t, sel.SelectedTxs(ctx), 1)
+
+	sel.Clear()
+	require.Empty(t, sel.SelectedTxs(ctx))
+	require.False(t, sel.initialized)
+	require.Equal(t, uint64(0), sel.clobGasUsed)
+	require.Equal(t, uint64(0), sel.regularGasUsed)
+	require.Equal(t, uint64(0), sel.totalTxBytes)
+}
+
+func TestCLOBTxSelectorBytesLimit(t *testing.T) {
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+
+	// maxTxBytes is tiny (1 byte). ComputeProtoSizeForTxs always returns > 1
+	// for any non-empty txBz, so the selector must halt immediately.
+	stop := sel.SelectTxForProposal(ctx, 1, 10_000_000, makeSelectorTx(false), []byte("tx"), 1_000)
+	require.True(t, stop, "should halt when tx exceeds the byte budget")
+	require.Empty(t, sel.SelectedTxs(ctx), "oversized tx must not be selected")
+}
+
+func TestCLOBTxSelectorCLOBRatioFull(t *testing.T) {
+	const (
+		maxBlockGas = 10_000_000
+		maxTxBytes  = 1_000_000_000
+	)
+
+	// ratio=1.0 → entire block reserved for CLOB; regular txs get zero budget
+	// unless CLOB quota is unused (rollover).
+	sel := newTestCLOBTxSelector(1.0, isCLOBTx)
+	ctx := context.Background()
+	txBz := []byte("tx")
+
+	// CLOB tx fits in the full quota.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, makeSelectorTx(true), txBz, 5_000_000)
+	require.False(t, stop)
+	require.Len(t, sel.SelectedTxs(ctx), 1)
+
+	// Regular tx: effectiveRegularLimit = 10M - 5M = 5M; 6M > 5M → halt.
+	stop = sel.SelectTxForProposal(ctx, maxTxBytes, maxBlockGas, makeSelectorTx(false), txBz, 6_000_000)
+	require.True(t, stop, "regular tx exceeding rollover budget should halt")
+	require.Len(t, sel.SelectedTxs(ctx), 1, "regular tx must not be selected")
+}
+
+func TestCLOBTxSelectorClearAndReuse(t *testing.T) {
+	const maxTxBytes = 1_000_000_000
+
+	sel := newTestCLOBTxSelector(0.3, isCLOBTx)
+	ctx := context.Background()
+	txBz := []byte("tx")
+
+	// First block: maxBlockGas=10M, clobGasLimit=3M.
+	sel.SelectTxForProposal(ctx, maxTxBytes, 10_000_000, makeSelectorTx(true), txBz, 2_000_000)
+	require.Len(t, sel.SelectedTxs(ctx), 1)
+	require.Equal(t, uint64(2_000_000), sel.clobGasUsed)
+
+	// Clear simulates the end-of-block reset.
+	sel.Clear()
+	require.False(t, sel.initialized)
+
+	// Second block: maxBlockGas=20M — clobGasLimit should be re-computed to 6M.
+	stop := sel.SelectTxForProposal(ctx, maxTxBytes, 20_000_000, makeSelectorTx(true), txBz, 5_000_000)
+	require.False(t, stop)
+	require.Equal(t, uint64(20_000_000), sel.maxBlockGas, "maxBlockGas should refresh after Clear")
+	require.Equal(t, uint64(6_000_000), sel.clobGasLimit, "clobGasLimit should be 0.3 × 20M")
+	require.Len(t, sel.SelectedTxs(ctx), 1)
+}

@@ -181,6 +181,7 @@ const (
 
 	FlagDisableTxReplacement       = "cronos.disable-tx-replacement"
 	FlagDisableOptimisticExecution = "cronos.disable-optimistic-execution"
+	FlagCLOBGasRatio               = "cronos.clob-gas-ratio"
 )
 
 var Forks = []Fork{}
@@ -386,7 +387,19 @@ func New(
 	var mpool mempool.Mempool
 	mempoolMaxTxs := cast.ToInt(appOpts.Get(server.FlagMempoolMaxTxs))
 	feeBump := cast.ToInt64(appOpts.Get(FlagMempoolFeeBump))
-	if mempoolMaxTxs >= 0 && feeBump >= 0 {
+	clobGasRatio := cast.ToFloat64(appOpts.Get(FlagCLOBGasRatio))
+	if clobGasRatio > 1.0 {
+		clobGasRatio = 1.0
+	}
+	if mempoolMaxTxs >= 0 && feeBump >= 0 && clobGasRatio > 0 {
+		logger.Info("NewCLOBMempool is enabled", "feebump", feeBump, "clobGasRatio", clobGasRatio)
+		signerExtractor := evmapp.NewEthSignerExtractionAdapter(mempool.NewDefaultSignerExtractionAdapter())
+		txReplacement := func(op, np int64, oTx, nTx sdk.Tx) bool {
+			threshold := 100 + feeBump
+			return np >= op*threshold/100
+		}
+		mpool = NewCLOBMempool(mempoolMaxTxs, signerExtractor, txReplacement)
+	} else if mempoolMaxTxs >= 0 && feeBump >= 0 {
 		// NOTE we use custom transaction decoder that supports the sdk.Tx interface instead of sdk.StdTx
 		// Setup Mempool and Proposal Handlers
 		logger.Info("NewPriorityMempool is enabled", "feebump", feeBump)
@@ -409,13 +422,22 @@ func New(
 	baseAppOptions = append(baseAppOptions, func(app *baseapp.BaseApp) {
 		app.SetMempool(mpool)
 
-		// Re-use the default prepare proposal handler, extend the transaction validation logic
 		defaultProposalHandler := baseapp.NewDefaultProposalHandlerFast(mpool, app)
-		defaultProposalHandler.SetTxSelector(NewExtTxSelector(
-			baseapp.NewDefaultTxSelector(),
-			txDecoder,
-			blockProposalHandler.ValidateTransaction,
-		))
+		if _, ok := mpool.(*CLOBMempool); ok {
+			defaultProposalHandler.SetTxSelector(NewCLOBTxSelector(
+				clobGasRatio,
+				isCLOBTx,
+				blockProposalHandler.ValidateTransaction,
+				txDecoder,
+			))
+		} else {
+			// Re-use the default prepare proposal handler, extend the transaction validation logic
+			defaultProposalHandler.SetTxSelector(NewExtTxSelector(
+				baseapp.NewDefaultTxSelector(),
+				txDecoder,
+				blockProposalHandler.ValidateTransaction,
+			))
+		}
 
 		app.SetPrepareProposal(defaultProposalHandler.PrepareProposalHandler())
 
