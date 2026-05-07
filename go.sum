@@ -915,8 +915,6 @@ github.com/crypto-org-chain/cronos-store/store v0.0.0-20260429121538-3f57193d875
 github.com/crypto-org-chain/cronos-store/store v0.0.0-20260429121538-3f57193d8754/go.mod h1:QtmMmgHYQqioX/U2OfucmqDgXMmrL3N8/QXom4UWeKg=
 github.com/crypto-org-chain/cronos-store/versiondb v0.0.0-20260429121538-3f57193d8754 h1:EKdjmF1OPWiDNOeYIpGJ1xkTszvEd51lkI3pEBlncUo=
 github.com/crypto-org-chain/cronos-store/versiondb v0.0.0-20260429121538-3f57193d8754/go.mod h1:6sg+tT7xMKDS8HL9Rxq1QsLJHApMuh+vnr2HVl3utl0=
-github.com/crypto-org-chain/ethermint v0.22.1-0.20260420091552-962837e784b6 h1:22pSG0hT1+w0bm5MSYeIK26SPXXMfQTpa/3aXhP3eAM=
-github.com/crypto-org-chain/ethermint v0.22.1-0.20260420091552-962837e784b6/go.mod h1:FrMBOJjJFGiWDQUDmwZNKsw2Gz5tvl9AYEfUuD7lvSQ=
 github.com/crypto-org-chain/go-block-stm v0.0.0-20241213061541-7afe924fb4a6 h1:6KPEi8dWkDSBddQb4NAvEXmNnTXymF3yVeTaT4Hz1iU=
 github.com/crypto-org-chain/go-block-stm v0.0.0-20241213061541-7afe924fb4a6/go.mod h1:iwQTX9xMX8NV9k3o2BiWXA0SswpsZrDk5q3gA7nWYiE=
 github.com/crypto-org-chain/go-ethereum v1.10.20-0.20250815065500-a4fbafcae0dd h1:ebSnzvM9yKVGFjvoGly7LFQQCS2HuOWMCvQyByJ52Gs=
@@ -1348,6 +1346,8 @@ github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839 h1:W9WBk7
 github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839/go.mod h1:xaLFMmpvUxqXtVkUJfg9QmT88cDaCJ3ZKgdZ78oO8Qo=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
+github.com/jayt106/ethermint v0.4.2-0.20260507002212-20e64f4eb695 h1:kts10aBtGJerGA6Bzw2Vdt0lqrydCM2jponDgLa5hHc=
+github.com/jayt106/ethermint v0.4.2-0.20260507002212-20e64f4eb695/go.mod h1:FrMBOJjJFGiWDQUDmwZNKsw2Gz5tvl9AYEfUuD7lvSQ=
 github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jhump/protoreflect v1.9.0 h1:npqHz788dryJiR/l6K/RUQAyh2SwV91+d1dnh4RjO9w=
