@@ -1348,6 +1348,8 @@ github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7Bd
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jayt106/ethermint v0.4.2-0.20260507002212-20e64f4eb695 h1:kts10aBtGJerGA6Bzw2Vdt0lqrydCM2jponDgLa5hHc=
 github.com/jayt106/ethermint v0.4.2-0.20260507002212-20e64f4eb695/go.mod h1:FrMBOJjJFGiWDQUDmwZNKsw2Gz5tvl9AYEfUuD7lvSQ=
+github.com/jayt106/ethermint v0.4.2-0.20260507141658-6896c2038d64 h1:f7UvhTtTv/JIDnXrS9ZRQLJ2zjx4CoaL4gI4y7KV9xw=
+github.com/jayt106/ethermint v0.4.2-0.20260507141658-6896c2038d64/go.mod h1:FrMBOJjJFGiWDQUDmwZNKsw2Gz5tvl9AYEfUuD7lvSQ=
 github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jhump/protoreflect v1.9.0 h1:npqHz788dryJiR/l6K/RUQAyh2SwV91+d1dnh4RjO9w=
