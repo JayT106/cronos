@@ -328,8 +328,8 @@ schema = 3
     version = "v0.2.2"
     hash = "sha256-0MLfSJKdeK3Z7tWAXTdzwB4091dmyxIX38S5SKH5QAw="
   [mod."github.com/evmos/ethermint"]
-    version = "v0.4.2-0.20260507141658-6896c2038d64"
-    hash = "sha256-zjRdw03WBySSzJNcsN7aAo45tnP1FKc2T8WiJp5cWBI="
+    version = "v0.4.2-0.20260511165251-1d1b5d406db0"
+    hash = "sha256-XdudFhlzb6U7m0qcmYs8jyXHbULrIq919d1hBdMkmbs="
     replaced = "github.com/jayt106/ethermint"
   [mod."github.com/fatih/color"]
     version = "v1.17.0"
