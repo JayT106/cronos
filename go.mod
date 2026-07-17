@@ -401,7 +401,7 @@ replace (
 	// release/v1.16
 	github.com/ethereum/go-ethereum => github.com/crypto-org-chain/go-ethereum v1.10.20-0.20260521015249-663dca6c618e
 	// ethermint #1051: txpool namespace (content/inspect/status/contentFrom) backed by app mempool.
-	github.com/evmos/ethermint => github.com/JayT106/ethermint v0.4.2-0.20260717172038-24a75d64017d
+	github.com/evmos/ethermint => github.com/JayT106/ethermint v0.4.2-0.20260717191419-648074c81069
 	// Fix upstream GHSA-h395-qcrw-5vmq and GHSA-3vp4-m3rf-835h vulnerabilities.
 	// TODO Remove it: https://github.com/cosmos/cosmos-sdk/issues/10409
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.0
