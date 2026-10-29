@@ -23,13 +23,24 @@ pending cronos PRs (§5) ──────────────────�
 
 | Repo | State today | Needed |
 |---|---|---|
-| crypto-org-chain/cometbft | #71 open (v0.40.0 + fork #51 app-mempool fix + lp2p queue cap). Fork #50, #54, #64 already upstream. All commits in Cronos's current pin are covered. | Fix the `MedianTime` upgrade-height risk (§4.3). Merge #71, decide on #72. Repin SDK to the merge commit. |
+| crypto-org-chain/cometbft | #71 open (v0.40.0 + fork #51 app-mempool fix + lp2p queue cap). Fork #50, #54, #64 already upstream. All commits in Cronos's current pin are covered. | Fix the `MedianTime` upgrade-height risk (§4.3). Merge #71; skip #72 (see below). Repin SDK to the merge commit. |
 | crypto-org-chain/cosmos-sdk | #1888 open on `release/v0.55.x`; #1889 stacked. | Merge both. #1889 changes the staking queue index and the upgrade handler (§4), so land it before Cronos pins. |
 | crypto-org-chain/cronos-store | Pins SDK v0.54.3, CometBFT v0.39.3. `store/v2` stays `v2.0.0` in v0.55. memiavl already supports `StoreUpgrades.Deleted`. | go.mod bump (SDK, CometBFT, Go 1.26.10), plus the v1.9 roadmap work (§12): drop `iavl`, `erigon-lib` and the 2017 file-lock dependency from memiavl; fix versiondb parallelism and the per-block fsync. Run memiavl/versiondb tests; tag. Only Cronos depends on it, so this runs in parallel with the ethermint port. |
 | cosmos/ibc-go | v11.2.0 still pins SDK v0.54.0. `main` (still `/v11`) moved to SDK v0.55.0 + CometBFT v0.40.0 in cosmos/ibc-go#9011 (merge commit `ae841d41a589`). `main` after that carries state-machine-breaking commits in no tag (e.g. #9033 future-revision packet timeouts, #9080 `RecoverClient`). | Prefer a reviewed v11 tag with #9011. If none ships in time, pin exactly `ae841d41a589` and review its delta from v11.1.0 for state-machine changes. Don't track `main`. |
 | crypto-org-chain/ethermint | No v0.55 branch. Main pins SDK fork v0.54. | Full port (§2) after its pending PRs (§5). Tag a new minor. |
 
-#72 content (for the §10 decision): recover the AppMempool from app errors and panics; drop failed-CheckTx txs from the seen cache after `check_tx_retry_delay`; throttled logs; a `failed_txs` metric; zero `seen_cache_size` / `check_tx_retry_delay` rejected at config validation.
+#72 content: recover the AppMempool from app errors and panics; drop failed-CheckTx txs from the seen cache after `check_tx_retry_delay`; throttled logs; a `failed_txs` metric; zero `seen_cache_size` / `check_tx_retry_delay` rejected at config validation.
+
+**Decision: skip #72 for v1.9.** What it fixes only triggers when the app returns a Go error or panics:
+
+- **Rejections are already handled by #71.** A tx rejected with a response code leaves the seen cache after a delay: every code on the RPC CheckTx path, and only retryable codes (≥ `CodeTypeRetry`) on the peer path, by design. Cronos reports every rejection as a code: `Manager.InsertTx` and `Manager.CheckTxHandler` always return a nil error. The only Go-error path is `App.CheckTx` with `dummyCheckTx` set, a benchmark-only mode.
+- **Without #72, a panic in Cronos code degrades the node silently but doesn't crash it or affect consensus:**
+  - in CheckTx, the RPC broadcast hangs until timeout;
+  - in ReapTxs, the node stops gossiping its own txs until restart;
+  - in a peer InsertTx, that peer is dropped.
+- **Cover this in Cronos instead:** add `recover` to `NewReapTxsHandler` (return an empty reap), `Manager.InsertTx` and the CheckTx handler's non-`runTx` code (return a code, never a Go error), with tests. Alert on the node's reaped-tx metric staying flat.
+- Without #72, setting `mempool.seen_cache_size` or `check_tx_retry_delay` to 0 panics at startup. Cronos's defaults are 100000 and 5s; the operator guide should say not to set either to 0.
+- Revisit #72 when the fork next rebases.
 
 ## 2. Ethermint port (critical path)
 
@@ -125,6 +136,12 @@ Handler steps, in order:
 3. **Staking queue index.** With #1889 merged, `Migrate5to6` recomputes the earliest-time gate keys (`0x44`–`0x46`) and `PopulateQueuePendingSlots` is a deprecated alias: drop the call. Without #1889, keep the call (v1.8 already ran it; rerun is safe).
 4. Set Cronos-specific params if the defaults don't fit (e.g. `key_rotation_fee`, §7).
 5. Drop the v1.8-only steps (IBC prune, `CroBridgeContractAddresses`) once v1.8 is the floor.
+6. **EVM storage compaction (ethermint#1120).** `RunMigrations` also runs `evm` 8 → 9 (mainnet and testnet are at 8, §6). It turns on `compact_storage` and starts the zero-slot sweep. What follows:
+   - **Sweep cost.** The sweep deletes zeroed slots at 10k slots per block for ~12.5k blocks (~1.7 h at 0.48 s). One batch costs 25–40 ms on a 100k-slot tree and more on mainnet's ~125M slots; measure it on a mainnet snapshot, because at 0.48 s blocks that is ≥ 5–8% of the block.
+   - **Storage.** memiavl state shrinks ~29% after the sweep. Existing versiondb nodes grow ~4% (+143 MB of delete markers).
+   - **Proofs.** `eth_getProof` storage proofs cover the trimmed stored bytes, and a deleted zero slot returns a non-existence proof. Tell bridges and anyone verifying EVM storage proofs.
+   - **Gas.** EVM calls made from Cosmos messages (e.g. `CallEVM`) use less KV gas after the switch. Ethereum txs are unchanged.
+   - **Export.** The sweep cursor isn't exported. A chain restarted from a pre-v9 export sets `compact_storage: true` in genesis.
 
 ### 4.1 Security: `key_rotation_fee_pool` pre-funding grief
 
@@ -146,7 +163,9 @@ Live check 2026-10-29: the address (`0x03d9eba4c892f3066b2d1e30853e4afff0bdf959`
 
 ### 4.3 CometBFT `MedianTime` change can halt the chain at the upgrade height
 
-CometBFT v0.40 (cometbft#5901) makes `MedianTime` skip `Nil` precommits; v0.39.3 skipped only `Absent`. `validateBlock` requires `block.Time == MedianTime(block.LastCommit)`, and the change has no height gate.
+In plain terms: each block's timestamp isn't chosen freely. It's the stake-weighted median of the timestamps on the previous block's precommit votes, and every node recomputes it to check the block. CometBFT v0.40 changes which votes count: it drops "nil" votes (validators who voted for no block). If the old and new binaries compute different times for the upgrade block, the new binary rejects a block the old binary already committed, and the chain can't move forward.
+
+The details: CometBFT v0.40 (cometbft#5901) makes `MedianTime` skip `Nil` precommits; v0.39.3 skipped only `Absent`. `validateBlock` requires `block.Time == MedianTime(block.LastCommit)`, and the change has no height gate.
 
 - The upgrade-height block H is proposed and committed by v0.39 binaries. CometBFT saves block H and its seen commit before `FinalizeBlock`, then the SDK halts in `PreBlock`.
 - On restart, the v0.40 binary replays H through `Handshaker.replayBlock` → `ApplyBlock` → `validateBlock` (normal consensus uses `ApplyVerifiedBlock`, but the handshake doesn't), using the new rule on H's `LastCommit` (the commit for H-1).
@@ -178,7 +197,7 @@ All three Cronos PRs touch `app/mempool`, which is where most v0.55 mempool inte
 | cronos#2239 pool tx lookup for tx replacement (draft) + ethermint#1130 | `app/app.go`, `app/mempool/manager.go`, `app/proposal.go` (`ExtTxSelector`), `go.mod`, `test_upgrade.py` | Land together before the ethermint port starts, or both sides get redone. |
 | cronos#2159 recheck per signer group (draft) | `app/mempool/manager.go`, `exec.go`, `scheduler.go`, recheck tests | Land before the branch cut if ready; otherwise rebase onto `feat/sdk-v0.55` and switch its `SelectBy` usage to `PooledTx`. |
 | ethermint#1118 skip historical state in block RPCs | `rpc/backend` validator lookups (also touched by §2 key rotation) | Land before the port; then apply the §2 rotation fix on top. |
-| ethermint#1120 compact EVM storage + sweep zeroed slots | Adds evm v8 → v9 migration, params proto change, and a BeginBlock sweep (10k slots/block for ~12.5k blocks) | Decide whether it ships in the same upgrade. If yes, include it in §4, §6 and §8 (migration runtime, sweep load on block time). |
+| ethermint#1120 compact EVM storage + sweep zeroed slots | Adds evm v8 → v9 migration, the `compact_storage` param, and a BeginBlock sweep (10k slots/block for ~12.5k blocks) | **In v1.9.** Same evm package as #1136; they share only `keeper/statedb_test.go`, but #1120 changes the `SetState` encoding that #1136's statedb rework drives. Land #1136 first, rebase #1120 on it and re-run both statedb test suites, all before the SDK port. Upgrade and test impact are in §4 and §8. |
 | ethermint#1136 go-ethereum v1.17.10 (draft) | `go.mod`, `x/evm/types/msg.go` (§2 textual), `x/evm/keeper/utils.go` and `grpc_query.go` (§2 rotation fix), other `x/evm/keeper` and statedb files | In v1.9 scope per the roadmap (§12). Land it on ethermint main before the SDK port starts, and rebase the port on it, so EVM and SDK regressions can be bisected separately. Both ship in the one v1.9 upgrade. |
 
 Cut `feat/sdk-v0.55` from main after cronos#2216 and cronos#2239 land.
@@ -240,25 +259,27 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
   - `key_rotation_fee_pool` pre-funded account conversion;
   - `MaxVersionUpgradeStoreLoader` deleting `params` on memiavl and IAVL, with and without versiondb;
   - `ExtTxSelector` gas source;
-  - ethermint `GetParams` with the params key missing, and coinbase lookup across a key rotation.
+  - ethermint `GetParams` with the params key missing, and coinbase lookup across a key rotation;
+  - a panic injected into the ReapTxs handler, `Manager.InsertTx` and the CheckTx handler returns an empty reap or an error code, never a Go error (stands in for cometbft#72);
+  - ML-DSA account tx signing and gas (§11.0).
 - Integration (pystarport):
   - full suite;
   - `test_upgrade.py` v1.8 → v1.9 with a pre-funded pool address, a historical params proposal, and versiondb enabled (the §4.3 case is a CometBFT fork unit test);
   - `test_app_mempool.py` for the CheckTx error code change;
   - a key rotation with EVM txs around the apply height.
 - Upgrade package (`integration_tests/configs/upgrade-test-package.nix`): add a `released1_8` entry and rename `current` from `"v1.8"` to `"v1.9"`.
-- Mainnet-state dry run: in-place upgrade on a mainnet snapshot (memiavl + versiondb), then `cronosd export` and historical gov/tx queries.
+- Mainnet-state dry run: in-place upgrade on a mainnet snapshot (memiavl + versiondb), then `cronosd export` and historical gov/tx queries. Let the ethermint#1120 sweep run to the end and record its per-block BeginBlock time, total duration, and memiavl/versiondb size change.
 - Performance: testground benchmark vs v1.8 baseline (block time, admission, max block). Watch CometBFT v0.40 block size accounting and gas-selection changes.
 - Sims: `TestAppImportExport`, `TestAppStateDeterminism` after `x/params` removal.
 
 ## 9. Delivery sequence
 
-1. Fix §4.3 in the CometBFT fork; merge cometbft#71 (+ #72 decision) → repin SDK.
+1. Fix §4.3 in the CometBFT fork (revert cometbft#5901 recommended, hard-coded gate as fallback; §10.7); merge cometbft#71 (without #72) → repin SDK.
 2. Merge cosmos-sdk#1888, #1889 → tag fork v0.55.x.
 3. §6 checks ran 2026-10-29. Re-run the pool-address and open-proposal checks right before submitting the upgrade proposal.
 4. In parallel:
    - cronos-store bump + tag; ibc-go pin (§1);
-   - land cronos#2216, cronos#2239 + ethermint#1130, ethermint#1118, ethermint#1136 (go-ethereum v1.17, §12); decide ethermint#1120; land or schedule cronos#2159 (§5).
+   - land cronos#2216, cronos#2239 + ethermint#1130, ethermint#1118, ethermint#1136 (go-ethereum v1.17, §12), then ethermint#1120 rebased on it; land or schedule cronos#2159 (§5).
 5. Ethermint v0.55 port (§2) → tag.
 6. Cronos PR on `feat/sdk-v0.55`: deps + §3 + legacy types (§4.2), then the upgrade handler (§4) in a second commit.
 7. §8 tests, testnet upgrade, operator guide (`docs/migrations/`), mainnet proposal.
@@ -270,15 +291,24 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
 2. `ExtTxSelector`/reap: declared gas limit or ante `gasWanted`?
 3. `key_rotation_fee` value for Cronos staking.
 4. Keep `contrib/x/crisis` for this hop (recommended) or remove it now.
-5. Take cometbft#72 in this release or later.
-6. Ship ethermint#1120 (evm v9 storage migration) in the same upgrade or separately.
+5. ~~cometbft#72~~: decided, skip for v1.9; cover panics in Cronos code instead (§1).
+6. ~~ethermint#1120~~: decided, ships in v1.9 (§4 step 6).
 7. CometBFT `MedianTime` change (§4.3): revert cometbft#5901 in the fork (recommended) or gate it with a hard-coded per-chain height.
-8. ML-DSA-65 (§11): go/no-go after the Phase 2 measurements, and whether the storage/bandwidth cost is worth it before quantum attacks on ed25519 are practical.
+8. ~~ML-DSA-65~~: decided, support it. v1.9 ships the capability and the Cronos pieces it needs (§11.0). Turning validator keys on is a governance step after v1.9: testnet first, mainnet once the §11.4 blockers clear.
 9. `x/e2ee` hybrid keys (§12.3): store both keys per address (recommended), or use a coordinated registration window.
 
 ## 11. Phase 2: validator migration to ML-DSA-65 consensus keys
 
 Goal: post-quantum consensus security, i.e. every validator signing with `ml_dsa_65` (NIST FIPS 204). This is **not** part of the v0.55 upgrade handler. v0.55 + CometBFT v0.40 only make it possible; turning it on is a governance and operator rollout after the upgrade is stable.
+
+### 11.0 What v1.9 ships for ML-DSA
+
+v0.55 and CometBFT v0.40 bring the key types. Cronos needs these on top so ML-DSA can be turned on later without another binary:
+
+- **Validator keys:** the ethermint coinbase/`miner` fix for rotation (§2), the `key_rotation_fee_pool` handler fix (§4.1), and `cronosd init --consensus-key-algo ml_dsa_65` working in Cronos's CLI. Test: a rotation to ML-DSA on a local net, with EVM txs around the apply height.
+- **Account keys (Cosmos txs only):** add `ml_dsa_65` to `cronosd`'s keyring algorithms (`root.go:79` allows only `eth_secp256k1`/`secp256k1` today). Test: sign and broadcast a Cosmos tx with an ML-DSA account; check gas uses `SigVerifyCostMlDsa65`.
+- **Inbound IBC:** works with CometBFT v0.40. Cronos's light clients can verify counterparties that adopt ML-DSA.
+- **Chain params at the upgrade:** `pub_key_types` stays `["ed25519"]`. Turning on `ml_dsa_65` is a later gov proposal (§11.2), on testnet first.
 
 ### 11.1 Scope: what it does and doesn't protect
 
@@ -292,12 +322,12 @@ Goal: post-quantum consensus security, i.e. every validator signing with `ml_dsa
 
 1. **Enable the key type** with a gov proposal to `x/consensus` `MsgUpdateParams` (`tx consensus update-params-proposal`). The proposal takes the **entire** params (block, evidence, validator, abci). Fetch the current `cronosd q consensus params`, change only `validator.pub_key_types` to `["ed25519", "ml_dsa_65"]`, and submit the full JSON; a partial JSON zeroes the block and evidence params. This must happen before any rotation. Never remove `ed25519` while any validator uses it: the next voting-power update for that validator fails validation and halts the chain.
 2. **Each validator rotates** with `tx staking rotate-cons-pub-key <new ml_dsa_65 pubkey>`:
-   - Generate the key offline (`cronosd init --consensus-key-algo ml_dsa_65` in a scratch home).
+   - Generate the key offline (`cronosd init <moniker> --chain-id <cronos chain-id> --consensus-key-algo ml_dsa_65 --home <scratch dir>`). It also writes a throwaway genesis and node key there; keep only `priv_validator_key.json`.
    - Timing: if the tx executes at height h, the validator still signs with the old key at h and h+1, and the new key must sign from h+2. Swap after block h+1 commits and before h+2: replace `priv_validator_key.json` and restart the validator node (or start an already-synced standby node holding only the new key and stop the old one). Missing the window costs missed blocks, not a fault.
    - At the swap, remove the old key file from that host. Never let the old key run on two nodes, and never copy it to a second node. Two signers on one key is a double sign and tombstones the validator.
    - One rotation per validator per unbonding period (28 days on Cronos), so a bad rotation can't be fixed for 28 days.
    - The operator account pays `key_rotation_fee` (burned) from its **unbonded** `stake` balance, plus gas in CRO. Gas covers tx size (~10 gas/byte, ~22k gas for the ~2 KB pubkey) and several ~2 KB state writes (30 gas/byte), and fees go through ethermint's dynamic fee checker. Estimate on testnet; treat `--gas-adjustment 1.5` as a floor.
-   - The key is a raw keypair with no mnemonic, so back up the key file itself.
+   - By default the key is a random raw keypair with no mnemonic, so back up the key file itself. `init --recover` derives it deterministically from a mnemonic instead, which gives a second way to restore it.
 3. **Done** when every validator reports `cometbft/PubKeyMlDsa65` in `/validators`. At only 2/3 there is no fault margin: an attacker who can forge the remaining ed25519 keys (just under 1/3) breaks safety with one more Byzantine validator, and light clients trust 1/3.
 4. **Residual risk after rotation:** evidence against a rotated-away ed25519 address stays admissible until both `evidence.max_age_num_blocks` and `max_age_duration` have passed (mainnet: 210,000 blocks ≈ 28 h at 0.48 s, and 1 day; testnet: 28 days). Until then, a quantum attacker could forge double-sign evidence with the old key and slash or tombstone the validator.
 
