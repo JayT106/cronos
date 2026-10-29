@@ -25,7 +25,7 @@ pending cronos PRs (§5) ──────────────────�
 |---|---|---|
 | crypto-org-chain/cometbft | #71 open (v0.40.0 + fork #51 app-mempool fix + lp2p queue cap). Fork #50, #54, #64 already upstream. All commits in Cronos's current pin are covered. | Fix the `MedianTime` upgrade-height risk (§4.3). Merge #71, decide on #72. Repin SDK to the merge commit. |
 | crypto-org-chain/cosmos-sdk | #1888 open on `release/v0.55.x`; #1889 stacked. | Merge both. #1889 changes the staking queue index and the upgrade handler (§4), so land it before Cronos pins. |
-| crypto-org-chain/cronos-store | Pins SDK v0.54.3, CometBFT v0.39.3. `store/v2` stays `v2.0.0` in v0.55. memiavl already supports `StoreUpgrades.Deleted`. | go.mod bump only (SDK, CometBFT, Go 1.26.10); run memiavl/versiondb tests; tag. Only Cronos depends on it, so this runs in parallel with the ethermint port. |
+| crypto-org-chain/cronos-store | Pins SDK v0.54.3, CometBFT v0.39.3. `store/v2` stays `v2.0.0` in v0.55. memiavl already supports `StoreUpgrades.Deleted`. | go.mod bump (SDK, CometBFT, Go 1.26.10), plus the v1.9 roadmap work (§12): drop `iavl`, `erigon-lib` and the 2017 file-lock dependency from memiavl; fix versiondb parallelism and the per-block fsync. Run memiavl/versiondb tests; tag. Only Cronos depends on it, so this runs in parallel with the ethermint port. |
 | cosmos/ibc-go | v11.2.0 still pins SDK v0.54.0. `main` (still `/v11`) moved to SDK v0.55.0 + CometBFT v0.40.0 in cosmos/ibc-go#9011 (merge commit `ae841d41a589`). `main` after that carries state-machine-breaking commits in no tag (e.g. #9033 future-revision packet timeouts, #9080 `RecoverClient`). | Prefer a reviewed v11 tag with #9011. If none ships in time, pin exactly `ae841d41a589` and review its delta from v11.1.0 for state-machine changes. Don't track `main`. |
 | crypto-org-chain/ethermint | No v0.55 branch. Main pins SDK fork v0.54. | Full port (§2) after its pending PRs (§5). Tag a new minor. |
 
@@ -98,7 +98,7 @@ No code change expected, but each can reject txs that v0.54 accepted:
 
 ## 4. Upgrade handler and store migrations
 
-Next plan name: assumed `v1.9` (`docs/migrations/v1.8-to-v1.9.md` already exists on main; #2216 extends it).
+Next plan name: `v1.9`, per the v1.9 roadmap proposal (§12). `docs/migrations/v1.8-to-v1.9.md` already exists on main; #2216 extends it.
 
 ```go
 upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
@@ -179,7 +179,7 @@ All three Cronos PRs touch `app/mempool`, which is where most v0.55 mempool inte
 | cronos#2159 recheck per signer group (draft) | `app/mempool/manager.go`, `exec.go`, `scheduler.go`, recheck tests | Land before the branch cut if ready; otherwise rebase onto `feat/sdk-v0.55` and switch its `SelectBy` usage to `PooledTx`. |
 | ethermint#1118 skip historical state in block RPCs | `rpc/backend` validator lookups (also touched by §2 key rotation) | Land before the port; then apply the §2 rotation fix on top. |
 | ethermint#1120 compact EVM storage + sweep zeroed slots | Adds evm v8 → v9 migration, params proto change, and a BeginBlock sweep (10k slots/block for ~12.5k blocks) | Decide whether it ships in the same upgrade. If yes, include it in §4, §6 and §8 (migration runtime, sweep load on block time). |
-| ethermint#1136 go-ethereum v1.17 (draft) | `go.mod`, `x/evm/types/msg.go` (§2 textual), `x/evm/keeper/utils.go` and `grpc_query.go` (§2 rotation fix), other `x/evm/keeper` and statedb files | Keep out of this upgrade unless already planned; it would compound risk. Expect conflicts with the port when it rebases. |
+| ethermint#1136 go-ethereum v1.17.10 (draft) | `go.mod`, `x/evm/types/msg.go` (§2 textual), `x/evm/keeper/utils.go` and `grpc_query.go` (§2 rotation fix), other `x/evm/keeper` and statedb files | In v1.9 scope per the roadmap (§12). Land it on ethermint main before the SDK port starts, and rebase the port on it, so EVM and SDK regressions can be bisected separately. Both ship in the one v1.9 upgrade. |
 
 Cut `feat/sdk-v0.55` from main after cronos#2216 and cronos#2239 land.
 
@@ -258,7 +258,7 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
 3. §6 checks ran 2026-10-29. Re-run the pool-address and open-proposal checks right before submitting the upgrade proposal.
 4. In parallel:
    - cronos-store bump + tag; ibc-go pin (§1);
-   - land cronos#2216, cronos#2239 + ethermint#1130, ethermint#1118; decide ethermint#1120; land or schedule cronos#2159 (§5).
+   - land cronos#2216, cronos#2239 + ethermint#1130, ethermint#1118, ethermint#1136 (go-ethereum v1.17, §12); decide ethermint#1120; land or schedule cronos#2159 (§5).
 5. Ethermint v0.55 port (§2) → tag.
 6. Cronos PR on `feat/sdk-v0.55`: deps + §3 + legacy types (§4.2), then the upgrade handler (§4) in a second commit.
 7. §8 tests, testnet upgrade, operator guide (`docs/migrations/`), mainnet proposal.
@@ -266,7 +266,7 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
 
 ## 10. Open decisions
 
-1. Target release: v1.9 alongside #2216, or a separate v1.10?
+1. ~~Target release~~: settled as v1.9 by the roadmap proposal (§12).
 2. `ExtTxSelector`/reap: declared gas limit or ante `gasWanted`?
 3. `key_rotation_fee` value for Cronos staking.
 4. Keep `contrib/x/crisis` for this hop (recommended) or remove it now.
@@ -274,6 +274,7 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
 6. Ship ethermint#1120 (evm v9 storage migration) in the same upgrade or separately.
 7. CometBFT `MedianTime` change (§4.3): revert cometbft#5901 in the fork (recommended) or gate it with a hard-coded per-chain height.
 8. ML-DSA-65 (§11): go/no-go after the Phase 2 measurements, and whether the storage/bandwidth cost is worth it before quantum attacks on ed25519 are practical.
+9. `x/e2ee` hybrid keys (§12.3): store both keys per address (recommended), or use a coordinated registration window.
 
 ## 11. Phase 2: validator migration to ML-DSA-65 consensus keys
 
@@ -350,3 +351,56 @@ Rollback: there is no fast rollback.
 - A validator can rotate back to ed25519 only after its 28-day window, and only to a **fresh** ed25519 key; the old address stays locked (`ErrConsensusPubKeyInRotationHistory`).
 - The key type can be removed from `pub_key_types` only after no validator uses it.
 - Once any ML-DSA validator is active, a software rollback to a pre-v0.55 binary is impossible, because older binaries can't parse the validator set.
+
+## 12. Alignment with the v1.9 roadmap proposal (October 2026)
+
+The roadmap slide ("Cronos v1.9: Roadmap Proposal", 01/02) puts this migration in v1.9, next to go-ethereum v1.17, Go 1.26 and cronos-store work, plus a post-quantum track. This section maps each item onto the plan and notes where the plan adds something or corrects the slide.
+
+### 12.1 Dependencies and integration
+
+| Roadmap item | Plan | Adds or corrects |
+|---|---|---|
+| Cosmos SDK v0.55 + CometBFT v0.40 | §1–§9 | The slide calls it an easy win. Three items must clear first: the upgrade-height halt (§4.3, ≈1% chance, fix in our CometBFT fork), the EVM coinbase gap during key rotation (§2), and the undecodable `ParameterChangeProposal`s (§4.2). |
+| go-ethereum v1.17.x (Amsterdam not activated) | §5 (ethermint#1136) | ethermint#1136 targets the crypto-org-chain fork `43022f1730ed` (Cronos stateful precompiles ported onto v1.17.10), still on Osaka rules. Two **state-machine-breaking** changes take effect at the upgrade height and need tests: (1) a stateful precompile reached by `CALL` inside a static context now gets `readonly = true`, so Cronos's bank, relayer and ICA precompiles reject write methods there (tracked separately as a security item; add a test for each precompile); (2) EIP-6780 SELFDESTRUCT moves balance in the interpreter, so bank event order changes (indexers). Before mainnet, add a replay of a mainnet block range on the v1.9 binary that compares app hashes and receipts, since the interpreter rewrite can't be checked by unit tests alone. "90% RPC equivalence" means some RPC responses differ; list the gaps in the operator guide. |
+| Go 1.26 toolchain | §7 (Go 1.26.10) | The fork needs 1.26.10, not just 1.26. Cheaper cgo calls may change the 2026-02 benchmark where pure-Go secp256k1 beat CGO on arm64; re-run the CGO vs pure-Go secp256k1 comparison (the 2026-02 benchmark isn't in the repo) before choosing the build mode. |
+| cronos-store dependencies | §1 (cronos-store row) | Not just a go.mod bump; see the notes below the table. |
+| libp2p node auto discovery | — | Struck from the slide; out of v1.9 scope. |
+
+cronos-store notes:
+
+- Invariant: memiavl's committed version must never exceed versiondb's (`MaxVersionStoreLoader` loads memiavl at the versiondb version, and app.go refuses to start when versiondb lags). The fsync change alters the commit order, so crash-test both orders: kill between the memiavl commit and the versiondb write, and between the versiondb write and the memiavl commit, then restart.
+- Dropping `iavl` removes only memiavl's import. versiondb (`tsrocksdb`, changeset client) and SDK `store/v2` still pull in `iavl v1.2.8`. memiavl uses iavl for ICS23 proof construction (`PathToLeaf`, `ProofInnerNode`) and its cache. Add tests that proofs stay byte-for-byte compatible (`abci_query` with prove, IBC membership proofs a counterparty accepts), plus snapshot export/import and state-sync.
+
+### 12.2 Post-quantum track
+
+| Roadmap bucket | Item | Plan status |
+|---|---|---|
+| Included with the upgrade | ML-DSA-65 validator and account keys, opt-in | Validator keys: ships with v0.55, `pub_key_types` stays `["ed25519"]` (§3.5, §11). Account keys: ethermint's `DefaultSigVerificationGasConsumer` falls through to the SDK, which charges `SigVerifyCostMlDsa65`, so ML-DSA Cosmos txs work. They can't sign EVM txs, and `cronosd keys add --algo ml_dsa_65` needs the algorithm added to Cronos's keyring options. Add one integration test that signs a Cosmos tx with an ML-DSA account. |
+| | In-place consensus key rotation | Ships with v0.55. Needs the §2 coinbase fix, §4.1 pool fix and the `key_rotation_fee` decision (§10.3). |
+| | IBC light clients verify PQ counterparties | Inbound only: with CometBFT v0.40, Cronos's `07-tendermint` clients can verify counterparties that adopt ML-DSA. Outbound (counterparties verifying Cronos) still needs their upgrades (§11.4). |
+| Ship on top in v1.9 | Hybrid X25519 + ML-KEM-768 keys in `x/e2ee` (blocklist) | See §12.3. |
+| | Crypto inventory and agility pass | No plan impact. |
+| Testnet only, or later | ML-DSA-44 verify precompile for EIP-7702 accounts (EIP still Draft) | A new precompile is consensus code, so the mainnet binary must not activate it: gate it by chain-id or an activation param that stays off on mainnet. The precompile address and interface may change before the EIP is final. |
+| | PQ consensus keys on mainnet | Matches §11 (separate phase). **Correct the slide's "~330 KB per block":** that's the SDK docs' example for 100 validators and 6 s blocks. For Cronos (29 validators, 0.48 s blocks) it's ~97 KB per commit, ~291 KB per height in the blockstore (stored 3×), ~52 GB/day and ~0.6 MB/s per peer link (§11.3). |
+| | Ethereum L1 PQ not before 2029 | No plan impact. |
+
+### 12.3 Hybrid ML-KEM keys in `x/e2ee`
+
+- **Validation is consensus code.** `ValidateRecipientKey` (`x/e2ee/types/msg.go:21`, also used by genesis validation in `types/keys.go:40`) accepts only `age.ParseX25519Recipient`. Accepting hybrid keys means also trying `age.ParseHybridRecipient` (`age1pq1…`; age v1.3.1 is already in `go.mod`). That changes which txs are valid, so it can only go live at the v1.9 upgrade height.
+- **Other X25519-only code:**
+  - the CLI commands `generate` (`client/cli/generate.go:38`, needs a hybrid identity generator), `pubkey` (`pubkey.go:41`), `encrypt` (`encrypt.go:52`), `encrypt-to-validators` (`encrypt_to_validators.go:72`, the admin blocklist flow that hits the mixed-recipient refusal) and `decrypt` (`decrypt.go:56`);
+  - the node, which loads exactly one identity with `age.ParseX25519Identity` (app.go:415-433);
+  - `ProposalHandler.Identity`, a single `age.Identity` passed to `age.Decrypt` (`app/proposal.go:225`).
+
+  All of these need code changes to handle hybrid keys and to hold both identities at once.
+- **No mixed recipients.** age v1.3.1 refuses to encrypt one file to post-quantum and classic recipients together (`incompatible recipients: can't mix post-quantum and classic recipients`, `age.go:134`, message at `:227`). Each address holds one key, and `RegisterEncryptionKey` overwrites it (`keeper.go:46`). So once the first validator registers a hybrid key, the admin can't encrypt a blocklist that includes every validator: hybrid for all is impossible until everyone has switched, and leaving a validator out means it proposes with no blocklist and accepts txs the others reject. **Blocklist updates are stuck from the first registration to the last.**
+- **Recommended fix:** in v1.9, let `x/e2ee` store a hybrid key next to the X25519 key for each address (state and proto change, at the upgrade height). Then:
+  1. validators register hybrid keys at their own pace while the admin keeps encrypting to X25519;
+  2. once every validator has a hybrid key, the admin switches the blocklist to hybrid in one update;
+  3. validators drop their X25519 identity afterwards.
+- **Alternatives:**
+  - freeze blocklist changes, except an emergency procedure, during one short coordinated registration window;
+  - have every validator register a hybrid key in the blocks right after the upgrade.
+
+  Both depend on every validator acting on time.
+- **Size.** A hybrid recipient string is ~1.95 K characters (1,216-byte key in bech32), against ~62 for X25519. Each recipient stanza carries a 1,120-byte encapsulation (~1.5 KB as base64 text in the age header), so a blocklist encrypted to 29 validators grows by about 43 KB. Check message and tx size limits for storing the blocklist and registering keys.
