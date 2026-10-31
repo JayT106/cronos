@@ -23,7 +23,7 @@ pending cronos PRs (§5) ──────────────────�
 
 | Repo | State today | Needed |
 |---|---|---|
-| crypto-org-chain/cometbft | #71 open (v0.40.0 + fork #51 app-mempool fix + lp2p queue cap). Fork #50, #54, #64 already upstream. All commits in Cronos's current pin are covered. | Fix the `MedianTime` upgrade-height risk (§4.3). Merge #71; skip #72 (see below). Repin SDK to the merge commit. |
+| crypto-org-chain/cometbft | #71 open (v0.40.0 + fork #51 app-mempool fix + lp2p queue cap). Fork #50, #54, #64 already upstream. All commits in Cronos's current pin are covered. | Fix the `MedianTime` upgrade-height risk with #94 (§4.3). Merge #71; skip #72 (see below). Repin SDK to the merge commit. |
 | crypto-org-chain/cosmos-sdk | #1888 open on `release/v0.55.x`; #1889 stacked. | Merge both. #1889 changes the staking queue index and the upgrade handler (§4), so land it before Cronos pins. |
 | crypto-org-chain/cronos-store | Pins SDK v0.54.3, CometBFT v0.39.3. `store/v2` stays `v2.0.0` in v0.55. memiavl already supports `StoreUpgrades.Deleted`. | go.mod bump (SDK, CometBFT, Go 1.26.10), plus the v1.9 roadmap work (§12): drop `iavl`, `erigon-lib` and the 2017 file-lock dependency from memiavl; fix versiondb parallelism and the per-block fsync. Run memiavl/versiondb tests; tag. Only Cronos depends on it, so this runs in parallel with the ethermint port. |
 | cosmos/ibc-go | v11.2.0 still pins SDK v0.54.0. `main` (still `/v11`) moved to SDK v0.55.0 + CometBFT v0.40.0 in cosmos/ibc-go#9011 (merge commit `ae841d41a589`). `v11.2.1-rc1` (2026-10-29, commit `f5cb662b9985`) tags `main`: SDK v0.55.0, CometBFT v0.40.0, Go 1.26.10. It also carries state-machine changes after #9011 (e.g. #9033 future-revision packet timeouts, #9080 `RecoverClient`) and the Go 1.26.10 bump (#9133). | Target the v11.2.1 line: review the state-machine changes since v11.1.0 for Cronos impact and use the RC on testnet. For mainnet, use a final tag whose `go.mod` resolves to SDK v0.55.0. `release/v11.2.x` is still on SDK v0.54, so the final tag's name and branch aren't confirmed yet. If no such tag exists at the release cut, pin the reviewed RC commit `f5cb662b9985` (or `ae841d41a589`, #9011 alone). Don't track `main`. |
@@ -167,6 +167,7 @@ Handler steps, in order:
    - **Proofs.** `eth_getProof` storage proofs cover the trimmed stored bytes, and a deleted zero slot returns a non-existence proof. Tell bridges and anyone verifying EVM storage proofs.
    - **Gas.** EVM calls made from Cosmos messages (e.g. `CallEVM`) use less KV gas after the switch. Ethereum txs are unchanged.
    - **Export.** The sweep cursor isn't exported. A chain restarted from a pre-v9 export sets `compact_storage: true` in genesis.
+7. **Enable the CometBFT median time rule** (§4.3): read the x/consensus params, set `MedianTime.EnableHeight = plan.Height + 1`, and write them back with `ParamsStore.Set`. Leave every other field as it is. Writing `plan.Height` instead fails CometBFT's update check ("past or current height") and halts every upgraded node at U; unit-test the value.
 
 ### 4.1 Security: `key_rotation_fee_pool` pre-funding grief
 
@@ -204,32 +205,29 @@ The details: CometBFT v0.40 (cometbft#5901) makes `MedianTime` skip `Nil` precom
 - The old binary can't recover it either, because it halts again at H. Only a patched v0.40 binary gets the chain going.
 - Without the gate, the same rule also makes v0.40 unable to blocksync or replay any pre-upgrade block whose commit has `Nil` precommits. (The decision below removes this block-time failure. Nodes syncing from genesis or a pre-upgrade snapshot still need the old binary up to H through cosmovisor, because the new app can't execute old blocks.)
 
-Fix in the fork (cometbft#71 or a follow-up) before scheduling:
+Fix in the fork (crypto-org-chain/cometbft#94) before scheduling:
 
-**Decision (§10.7): keep #5901, gated by a height hard-coded in the binary.** CometBFT v0.40 has no general feature-height consensus param (only `vote_extensions_enable_height`), so the gate lives in the fork:
+**Decision (§10.7): keep #5901, gated by a consensus param the upgrade handler sets.** The fork adds `ConsensusParams.MedianTime.EnableHeight` (fork-only proto field 100), following the `vote_extensions_enable_height` pattern:
 
-- **Where the rule is chosen.** `MedianTime` has two callers, `state.MakeBlock` and `validateBlock`, and every other path (proposal validation, handshake replay, blocksync) goes through `validateBlock`. Both callers hold the chain-id and height and pick the rule from them: a new v0.39-rule function (count `Nil` votes) below A, the existing v0.40 `MedianTime` (skip them) from A on. `MedianTime`'s signature stays as it is. Proposer and validators always agree.
-- **Activation height A = v1.9 upgrade height U + 1**, in a map keyed by chain-id. Mainnet `cronosmainnet_25-1` and testnet `cronostestnet_338-3` were read from live block headers. Test chains set it through a test hook.
-- **Fail closed for known networks.** A binary that runs the wrong rule splits from the network at about 1% of blocks.
-  - The two known chain-ids must have an explicit entry. A v1.9 binary built with that entry unset refuses to start on that chain-id.
-  - Only chain-ids not on the known list (devnets, tests, other chains on the fork such as Cronos POS before it adds its own entry) default to the v0.39 rule.
-  - At startup, log the chain-id and A. Include A in `cronosd version --long` so operators can check the whole validator set runs the same value.
-- **Release rules:**
-  - A must be ≥ U + 1. A ≤ U brings back the upgrade-height halt; A > U + 1 only delays the new rule.
-  - Every validator must run the same A.
-  - The testnet and mainnet releases are different builds with different tags, because the mainnet height isn't known when testnet ships. Never install the testnet build on mainnet.
-  - Pick U before building, bake in A, then submit the proposal with exactly U. If U changes (failed proposal, rescheduling), rebuild and re-release. A release check compares the proposal height with the binary's A.
-- **Never** use an operator-configured height. Nodes with different values split at the activation height.
-- Below A the v0.39 rule applies, so pre-upgrade blocks no longer fail the `invalid block time` check in the new binary. History before U still needs the old binaries through cosmovisor, because the v0.55 app can't execute pre-upgrade blocks.
-- The simpler alternative, reverting #5901 permanently, was considered and not chosen, to keep the fork's consensus behavior closer to upstream.
+- **Where the rule is chosen.** `MedianTime` has two callers, `state.MakeBlock` and `validateBlock`, and every other path (proposal validation, handshake replay, blocksync) goes through `validateBlock`. Both read `state.ConsensusParams.MedianTime` for the block's height: the v0.39 rule (count `Nil` votes) below the enable height, the v0.40 `MedianTime` (skip them) from it on. `0`, the default, keeps the v0.39 rule. Proposer and validators read the same consensus state, so they always agree.
+- **The Cronos v1.9 upgrade handler sets `EnableHeight = U + 1`** (U = `plan.Height`) in the x/consensus param store. Baseapp returns the stored params to CometBFT in every `FinalizeBlock`, and params set while finalizing block U apply from U + 1. The proposal carries only U; nobody types a second height.
+- **Why the replay still works.** The new binary replays block U with the params from U-1, where the field is still 0, so U is checked under the old rule it was committed with. A node syncing from genesis reads each height's params, so every pre-upgrade block uses the v0.39 rule.
+- **Update rules** (shared with `vote_extensions_enable_height`): it can't be set to a past or current height, and it can't be changed or unset once reached. A later gov `MsgUpdateParams` that omits it keeps it, because x/consensus merges updates through `params.Update`.
+- **Safe failure.** If the handler forgets to set it, the chain keeps the v0.39 rule and keeps running; it only misses the #5901 change. There is no per-network build, no startup refusal, and no height that every later release must carry.
+- **Not operator-configurable.** The value is consensus state, so validators can't disagree on it.
+- **Genesis export drops it.** SDK `x/genutil` `NewConsensusGenesis` copies only block, evidence and validator params, so a chain restarted from `cronosd export` goes back to the v0.39 rule (safe, not a halt). Re-set it in that restart's handler, or carry it in the export.
+- **Write it once.** After the enable height is reached, any change, including an explicit 0, fails CometBFT's update check and halts the chain. SDK gov `MsgUpdateParams` never sends the field, so only app code can do this.
+- **Keep field 100 in every later fork rebase.** The x/consensus store (part of the app hash) holds it; a build whose proto lacks it would drop the value on the next params write or export.
+- **State sync limitation.** The field isn't in `Header.ConsensusHash` (which covers only block max bytes and gas), the same as `vote_extensions_enable_height`. A lying state-sync primary can feed a node a wrong value; that node then fails to follow the chain (a liveness problem for that node, not a split). Use trusted state-sync RPC servers.
+- The earlier design (a per-chain-id height hard-coded in the binary, refusing to start when unset) was dropped for this one. Reverting #5901 permanently was also considered and not chosen, to keep the fork's consensus behavior closer to upstream.
 
 Raise it upstream too; a height gate is something upstream could adopt for every v0.39 → v0.40 chain. Tests in the CometBFT fork:
 
-- build block H whose `LastCommit` has a `Nil` precommit that shifts the median, then run the handshake replay with app = state = H-1 and store = H. Assert that the gated binary accepts it with activation = H+1, and that ungated v0.40 rejects it;
-- `MakeBlock` and `validateBlock` agree at activation-1, activation and activation+1;
-- an unknown chain-id keeps the v0.39 rule, and a known chain-id with no entry refuses to start.
+- build block H whose `LastCommit` has a `Nil` precommit that shifts the median, then run the handshake replay with app = state = H-1 and store = H, with an app that returns `EnableHeight = H+1` from `FinalizeBlock(H)`. Assert that the replay passes and stores H+1, and that a chain already enabled at H rejects the block;
+- `MakeBlock` and `validateBlock` agree when unset, and at enable height - 1, the enable height and enable height + 1;
+- `ValidateUpdate` rules for both enable heights, and `Update` keeping the field when the update omits it.
 
-Producing that exact commit in pystarport isn't controllable.
+In Cronos, an integration test checks that the upgrade handler sets U + 1 (query `/consensus_params` after the upgrade). Producing a commit with the exact `Nil` precommit in pystarport isn't controllable.
 
 ## 5. Pending PRs: land before the migration branch
 
@@ -329,6 +327,7 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
     - `BLOCKHASH` for the last 256 blocks;
     - `q staking historical-info` returns not found;
     - the evm/e2ee module versions;
+    - `/consensus_params` shows `median_time.enable_height` = U + 1;
   - `test_app_mempool.py` for the CheckTx error code change;
   - a key rotation with EVM txs around the apply height;
   - `x/e2ee` hybrid rollout: validators register hybrid keys while the blocklist stays X25519, then the blocklist switches to hybrid with `encrypt-to-validators`.
@@ -339,7 +338,7 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
 
 ## 9. Delivery sequence
 
-1. Gate cometbft#5901 by a per-chain-id activation height in the CometBFT fork (§4.3); merge cometbft#71 (without #72) → repin SDK. The mainnet/testnet heights are filled in at release time (step 7).
+1. Gate cometbft#5901 by the `MedianTime.EnableHeight` consensus param in the CometBFT fork (§4.3); merge cometbft#71 (without #72) → repin SDK.
 2. Merge cosmos-sdk#1888, #1889 → tag fork v0.55.x.
 3. §6 checks ran 2026-10-29. Re-run the pool-address and open-proposal checks right before submitting the upgrade proposal.
 4. In parallel:
@@ -351,13 +350,10 @@ The mainnet module-version map also lists removed modules (`capability`, `feeibc
    - the upgrade handler (§4);
    - mempool panic recovery (§3.5), which can land on main first since it doesn't depend on v0.55;
    - `x/e2ee` hybrid keys (§3.5, §12.3).
-7. §8 tests, testnet upgrade, operator guide (`docs/migrations/`), mainnet proposal. For each network (separate testnet and mainnet builds and tags):
-   - choose the upgrade height U and bake A = U + 1 into the CometBFT fork's activation map;
-   - point Cronos's own `go.mod` `replace github.com/cometbft/cometbft` at that gated fork commit (Go ignores the SDK's `replace`), and regenerate `gomod2nix.toml`;
-   - build the release, and check that the resolved CometBFT is the gated fork (`cronosd version --long` shows A for the chain-id);
-   - submit the proposal with exactly U (§4.3).
-
-   Every later release must keep the same A entries for both chain-ids; a binary without them would reject block U on replay.
+7. §8 tests, testnet upgrade, operator guide (`docs/migrations/`), mainnet proposal. One release serves both networks:
+   - point Cronos's own `go.mod` `replace github.com/cometbft/cometbft` at the gated fork commit (Go ignores the SDK's `replace`), and regenerate `gomod2nix.toml`;
+   - the upgrade handler sets `MedianTime.EnableHeight = plan.Height + 1` (§4.3);
+   - after each network upgrades, check that `/consensus_params` shows U + 1.
 8. After the upgrade is stable: ML-DSA-65 phase (§11).
 
 ## 10. Decisions
@@ -370,7 +366,7 @@ All items below are decided (2026-10-29); struck-through labels mark the origina
 4. ~~`x/crisis`~~: decided, keep for v1.9.
 5. ~~cometbft#72~~: decided, skip for v1.9; cover panics in Cronos code instead (§1).
 6. ~~ethermint#1120~~: decided, ships in v1.9 (§4 step 6).
-7. ~~CometBFT `MedianTime` change~~: decided, gate cometbft#5901 with a hard-coded per-chain-id activation height (§4.3).
+7. ~~CometBFT `MedianTime` change~~: decided, gate cometbft#5901 with a `MedianTime.EnableHeight` consensus param that the upgrade handler sets to U + 1 (§4.3). Revised 2026-10-30 from a hard-coded per-chain-id height.
 8. ~~ML-DSA-65~~: decided, support it. v1.9 ships the capability and the Cronos pieces it needs (§11.0). Turning validator keys on is a governance step after v1.9: testnet first, mainnet once the §11.4 blockers clear.
 9. ~~`x/e2ee` hybrid keys~~: decided, in v1.9, storing a hybrid key next to the X25519 key per address (§12.3).
 10. ~~`historical_entries`~~: decided, set to 0 and prune existing entries in the upgrade handler when EIP-2935 covers the last 256 blocks (§4 step 4).
