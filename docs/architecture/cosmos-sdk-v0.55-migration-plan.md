@@ -14,11 +14,11 @@ Sources:
 Every arrow is a hard block.
 
 ```
-cometbft#71 ─► cosmos-sdk#1888 ─► #1889 ─┬──────────────► ethermint v0.55 ─┬─► cronos
-                                         └─► cronos-store ─────────────────┤
-ibc-go (pinned, see below) ─────────────────► ethermint v0.55, cronos      │
-pending ethermint PRs (§5) ─────────────────► ethermint v0.55              │
-pending cronos PRs (§5) ───────────────────────────────────────────────────┘
+cometbft#94, #71 ─► cosmos-sdk#1888 ─► #1889 ─┬──────────────► ethermint v0.55 ─┬─► cronos
+                                              └─► cronos-store ─────────────────┤
+ibc-go (pinned, see below) ──────────────────────► ethermint v0.55, cronos      │
+pending ethermint PRs (§5) ──────────────────────► ethermint v0.55              │
+pending cronos PRs (§5) ────────────────────────────────────────────────────────┘
 ```
 
 | Repo | State today | Needed |
@@ -193,17 +193,17 @@ In plain terms: each block's timestamp isn't chosen freely. It's the stake-weigh
 The details: CometBFT v0.40 (cometbft#5901) makes `MedianTime` skip `Nil` precommits; v0.39.3 skipped only `Absent`. `validateBlock` requires `block.Time == MedianTime(block.LastCommit)`, and the change has no height gate.
 
 - The upgrade-height block H is proposed and committed by v0.39 binaries. CometBFT saves block H and its seen commit before `FinalizeBlock`, then the SDK halts in `PreBlock`.
-- On restart, the v0.40 binary replays H through `Handshaker.replayBlock` → `ApplyBlock` → `validateBlock` (normal consensus uses `ApplyVerifiedBlock`, but the handshake doesn't), using the new rule on H's `LastCommit` (the commit for H-1).
+- Without #94, on restart the v0.40 binary replays H through `Handshaker.replayBlock` → `ApplyBlock` → `validateBlock` (normal consensus uses `ApplyVerifiedBlock`, but the handshake doesn't), using the new rule on H's `LastCommit` (the commit for H-1).
 - If that commit contains a `Nil` precommit that moves the weighted median, validation fails with `invalid block time` on every node, and the chain halts.
 - **Measured on mainnet** (recomputing both rules from REST block data):
 
   | Sample | Blocks | Commits with a `Nil` precommit | v0.39 rule matches header | v0.40 would reject |
   |---|---|---|---|---|
-  | 2026-10-29, ending 102,782,600 | 300 | 6 | all checked | 2 (≈0.7%) |
+  | 2026-10-29, ending 102,782,600 | 300 | 6 | 8 of 8 checked | 2 (≈0.7%) |
   | 2026-11-01, ending 103,309,300 | 2,000 | 49 | 49 | 32 (1.6%) |
   | Oct 2026, ending 98,000,000 | 1,000 | 6 | 6 | 2 (0.2%) |
 
-  So an unpatched upgrade halts by chance roughly 0.2–1.6% of the time. The rate depends on how often validators precommit nil, so it is not constant.
+  So an unpatched upgrade would halt in roughly 0.2–1.6% of cases. The rate depends on how often validators precommit nil, so it is not constant.
 - The old binary can't recover it either, because it halts again at H. Only a patched v0.40 binary gets the chain going.
 - The same rule makes v0.40 unable to blocksync any pre-upgrade block whose commit has a `Nil` precommit that moves the median. That doesn't change the sync procedure: nodes syncing from genesis or a pre-upgrade snapshot already run the old binary up to H through cosmovisor, because the new app can't execute old blocks.
 
@@ -216,7 +216,7 @@ The details: CometBFT v0.40 (cometbft#5901) makes `MedianTime` skip `Nil` precom
 - **Tradeoff.** The handshake no longer cross-checks the tip's header against the local state. A mismatched block store and state DB now fails one block later, with a less direct error.
 - **Earlier designs, dropped.** A per-chain-id height hard-coded in the binary, then a `MedianTime.EnableHeight` consensus param set by the upgrade handler. Both worked but added fork-only consensus logic and halt risks of their own (a wrong value in the handler halted the chain). Reverting #5901 permanently was also considered and not chosen.
 
-Raise it upstream too, since every v0.39 → v0.40 chain has the same exposure. Test in the CometBFT fork: build block H whose `LastCommit` has a `Nil` precommit that moves the median and whose time follows the v0.39 rule. Run the handshake with app = state = H-1 (real app) and with app = H, state = H-1 (mock app). Assert both pass and keep H's time, and that `ValidateBlock` still rejects H outside the handshake. Producing a commit with the exact `Nil` precommit in pystarport isn't controllable, so Cronos has no integration test for it.
+Raise it upstream too, since every v0.39 → v0.40 chain has the same exposure. Test in the CometBFT fork: build block H whose `LastCommit` has a `Nil` precommit that moves the median and whose time follows the v0.39 rule. Run the handshake with app = state = H-1 (real app) and with app = H, state = H-1 (mock app). Assert both pass and keep H's time, and that `ValidateBlock` still rejects H outside the handshake. Cronos has no integration test for it; the fork's unit test covers it.
 
 ## 5. Pending PRs: land before the migration branch
 
